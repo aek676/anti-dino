@@ -29,6 +29,7 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
 
 # vercel
 .vercel
@@ -40,3 +41,8 @@ yarn-error.log*
 **/*.log
 package-lock.json
 **/*.bun
+
+# sqlite
+/data
+*.sqlite
+*.sqlite-*
