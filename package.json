@@ -1,15 +1,25 @@
 {
   "name": "anti-dino",
-  "version": "1.0.50",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "check": "biome check --write",
+    "test": "bun test"
   },
   "dependencies": {
-    "elysia": "latest"
+    "@elysiajs/cron": "^1.4.2",
+    "elysia": "^1.4.30",
+    "grammy": "^1.46.0"
   },
   "devDependencies": {
-    "bun-types": "latest"
-  },
-  "module": "src/index.js"
+    "@biomejs/biome": "2.5.12",
+    "bun-types": "^1.4.0",
+    "typescript": "^7.0.2"
+  }
 }
