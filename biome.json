@@ -57,7 +57,7 @@
 						"patterns": [
 							{
 								"group": ["**/modules/*/*/**"],
-								"message": "Importa solo index.ts, service.ts o model.ts de un módulo, no sus internos."
+								"message": "Import only index.ts, service.ts or model.ts from a module, not its internals."
 							}
 						]
 					}
@@ -125,5 +125,18 @@
 				"noReExportAll": "error"
 			}
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["env.d.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useNamingConvention": "off",
+						"useConsistentTypeDefinitions": "off"
+					}
+				}
+			}
+		}
+	]
 }
