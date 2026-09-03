@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["src/**", "env.d.ts"]
+		"includes": ["src/**"]
 	},
 	"formatter": {
 		"enabled": true,
@@ -186,12 +186,11 @@
 			}
 		},
 		{
-			"includes": ["env.d.ts"],
+			"includes": ["src/utils/env.ts"],
 			"linter": {
 				"rules": {
 					"style": {
-						"useNamingConvention": "off",
-						"useConsistentTypeDefinitions": "off"
+						"useNamingConvention": "off"
 					}
 				}
 			}
