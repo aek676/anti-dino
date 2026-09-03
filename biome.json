@@ -1,0 +1,129 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"includes": ["src/**", "env.d.ts"]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"domains": {
+			"project": "recommended",
+			"types": "recommended"
+		},
+		"rules": {
+			"preset": "recommended",
+			"correctness": {
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error",
+				"noUnresolvedImports": "error",
+				"noUndeclaredDependencies": "error"
+			},
+			"nursery": {
+				"noFloatingPromises": "error",
+				"noMisusedPromises": "error",
+				"useExhaustiveSwitchCases": "error"
+			},
+			"style": {
+				"useImportType": "error",
+				"noNonNullAssertion": "error",
+				"useNodejsImportProtocol": "error",
+				"noProcessEnv": "error",
+				"noExportedImports": "error",
+				"useThrowOnlyError": "error",
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"patterns": [
+							{
+								"group": ["**/modules/*/*/**"],
+								"message": "Importa solo index.ts, service.ts o model.ts de un módulo, no sus internos."
+							}
+						]
+					}
+				},
+				"useNamingConvention": {
+					"level": "error",
+					"options": {
+						"strictCase": true,
+						"requireAscii": true,
+						"conventions": [
+							{
+								"selector": {
+									"kind": "objectLiteralProperty"
+								},
+								"formats": ["camelCase", "snake_case"]
+							},
+							{
+								"selector": {
+									"kind": "typeProperty"
+								},
+								"formats": ["camelCase", "snake_case"]
+							}
+						]
+					}
+				},
+				"useFilenamingConvention": {
+					"level": "error",
+					"options": {
+						"filenameCases": ["kebab-case"],
+						"requireAscii": true,
+						"strictCase": true
+					}
+				},
+				"useConsistentTypeDefinitions": {
+					"level": "error",
+					"options": {
+						"style": "type"
+					}
+				},
+				"useConsistentArrayType": {
+					"level": "error",
+					"options": {
+						"syntax": "shorthand"
+					}
+				},
+				"noEnum": "error",
+				"noParameterAssign": "error",
+				"useDefaultParameterLast": "error",
+				"noUselessElse": "error",
+				"useCollapsedIf": "error",
+				"useExplicitLengthCheck": "error",
+				"useNumberNamespace": "error",
+				"useAsConstAssertion": "error"
+			},
+			"suspicious": {
+				"noConsole": "warn",
+				"noImportCycles": "error",
+				"useAwait": "error",
+				"useErrorMessage": "error",
+				"noEmptyBlockStatements": "error",
+				"noEvolvingTypes": "error",
+				"noUnnecessaryConditions": "warn"
+			},
+			"performance": {
+				"noReExportAll": "error"
+			}
+		}
+	}
+}
