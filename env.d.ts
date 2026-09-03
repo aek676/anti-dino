@@ -1,6 +1,7 @@
 declare module "bun" {
 	interface Env {
 		PORT?: string;
+		LOG_LEVEL?: string;
 		WEBHOOK_PATH: string;
 		PUBLIC_URL: string;
 
