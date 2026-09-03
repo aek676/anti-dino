@@ -26,9 +26,16 @@ bun run dev
 ```
 src/
   index.ts        servidor Elysia: webhook de Telegram + cron del vigilante
-  config.ts       lectura y validación de variables de entorno
-  bot/            comandos /start, /huecos, /parar (UC-1..3)
-  fresha/         único cliente que habla con Fresha (UC-7)
-  watcher/        comprobación periódica y avisos (UC-4..6)
-  db/             SQLite (bun:sqlite): suscriptores y huecos conocidos
+  utils/          código transversal sin dominio propio
+    logger.ts     logger pino compartido (plugin HTTP + módulos)
+    config.ts     lectura y validación de variables de entorno
+  modules/        una carpeta por feature (index.ts, service.ts, model.ts)
+    bot/          comandos /start, /huecos, /parar (UC-1..3)
+    fresha/       único cliente que habla con Fresha (UC-7)
+    watcher/      comprobación periódica y avisos (UC-4..6)
+    db/           SQLite (bun:sqlite): suscriptores y huecos conocidos
 ```
+
+Los imports que cruzan carpetas usan el alias `@/` (`@/utils/logger`,
+`@/modules/bot`). Biome lo obliga: no se permiten ficheros sueltos en la raíz
+de `src/`, imports relativos con `../`, ni importar internals de un módulo.

@@ -54,10 +54,22 @@
 				"noRestrictedImports": {
 					"level": "error",
 					"options": {
+						"paths": {
+							"pino": "Use the shared logger from @/utils/logger.",
+							"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+						},
 						"patterns": [
 							{
-								"group": ["**/modules/*/*/**"],
+								"group": ["@/modules/*/*/**"],
 								"message": "Import only index.ts, service.ts or model.ts from a module, not its internals."
+							},
+							{
+								"group": ["@/*"],
+								"message": "Don't import loose files from the src/ root: put shared code in @/utils and feature code in @/modules."
+							},
+							{
+								"group": ["../**"],
+								"message": "Use the @/ alias instead of relative imports that leave the current directory."
 							}
 						]
 					}
@@ -113,7 +125,7 @@
 				"useAsConstAssertion": "error"
 			},
 			"suspicious": {
-				"noConsole": "warn",
+				"noConsole": "error",
 				"noImportCycles": "error",
 				"useAwait": "error",
 				"useErrorMessage": "error",
@@ -127,6 +139,52 @@
 		}
 	},
 	"overrides": [
+		{
+			"includes": ["src/index.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"pino": "Use the shared logger from @/utils/logger.",
+									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+								},
+								"patterns": [
+									{
+										"group": ["@/modules/*/*/**"],
+										"message": "Import only index.ts, service.ts or model.ts from a module, not its internals."
+									},
+									{
+										"group": ["@/*"],
+										"message": "Don't import loose files from the src/ root: put shared code in @/utils and feature code in @/modules."
+									},
+									{
+										"group": ["../**"],
+										"message": "Use the @/ alias instead of relative imports that leave the current directory."
+									},
+									{
+										"group": ["./**"],
+										"message": "The entrypoint must import through the @/ alias."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/utils/logger.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": "off"
+					}
+				}
+			}
+		},
 		{
 			"includes": ["env.d.ts"],
 			"linter": {
