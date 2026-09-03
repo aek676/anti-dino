@@ -1,9 +1,10 @@
 import { createPinoLogger } from "@bogeychan/elysia-logger";
+import { env } from "@/utils/env";
 
-const isDev = Bun.env.NODE_ENV !== "production";
+const isDev = env.NODE_ENV !== "production";
 
 export const log = createPinoLogger({
-	level: Bun.env.LOG_LEVEL ?? (isDev ? "debug" : "info"),
+	level: env.LOG_LEVEL,
 	transport: isDev ? { target: "pino-pretty" } : undefined,
 	redact: [
 		"req.headers.authorization",
