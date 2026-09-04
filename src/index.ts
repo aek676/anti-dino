@@ -1,10 +1,16 @@
 import { Elysia } from "elysia";
+import { HEALTH_PATH, health } from "@/modules/health";
 import { closeDatabase, db } from "@/utils/db";
 import { env } from "@/utils/env";
 import { log } from "@/utils/logger";
 
 const app = new Elysia()
-	.use(log.into({ autoLogging: true }))
+	.use(
+		log.into({
+			autoLogging: { ignore: ({ path }) => path === HEALTH_PATH },
+		}),
+	)
+	.use(health(db))
 	.onStop(() => {
 		closeDatabase(db);
 	})
