@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    image: anti-dino:latest
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_PATH: /app/data/anti-dino.sqlite
+    ports:
+      - "3000:3000"
+    volumes:
+      - anti-dino-data:/app/data
+
+volumes:
+  anti-dino-data:
