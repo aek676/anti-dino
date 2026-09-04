@@ -46,3 +46,6 @@ package-lock.json
 /data
 *.sqlite
 *.sqlite-*
+
+# compiled binary
+/dist

@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts | pino-pretty",
     "start": "bun run src/index.ts",
+    "build": "bun build --compile --minify --target bun --outfile dist/server src/index.ts",
+    "build:linux-x64": "bun build --compile --minify --target bun-linux-x64 --outfile dist/server-linux-x64 src/index.ts",
+    "build:linux-arm64": "bun build --compile --minify --target bun-linux-arm64 --outfile dist/server-linux-arm64 src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint",
     "format": "biome format --write",

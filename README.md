@@ -16,5 +16,6 @@ bun run dev
 
 - `bun run dev` — server with hot reload
 - `bun run start` — server
+- `bun run build` — compile to a single binary at `dist/server`
 - `bun run typecheck` — `tsc --noEmit`
 - `bun test`
