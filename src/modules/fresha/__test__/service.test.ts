@@ -3,8 +3,11 @@ import { FreshaError } from "@/modules/fresha/model";
 import {
 	createFreshaService,
 	type FetchFn,
+	parseEmployees,
 	parseServices,
 } from "@/modules/fresha/service";
+import addService from "./fixtures/add-service.json";
+import employees from "./fixtures/employees.json";
 import initialize from "./fixtures/initialize.json";
 
 const respond =
@@ -87,5 +90,106 @@ describe("listServices", () => {
 		).listServices(slug);
 
 		expect(result).toMatchObject({ kind: "unknown-operation" });
+	});
+});
+
+describe("parseEmployees", () => {
+	const screen = employees.data.bookingFlowActionButtonPressed.screenEmployee;
+
+	test("keeps only real professionals, dropping the 'any' tile", () => {
+		expect(parseEmployees(screen)).toEqual([
+			{ id: 5236325, name: "Sergio" },
+			{ id: 3182031, name: "Elvis" },
+		]);
+	});
+});
+
+describe("listEmployees", () => {
+	const sequence = (bodies: unknown[]) => {
+		const calls: {
+			operationName: string;
+			variables: Record<string, unknown>;
+		}[] = [];
+		const fetchFn: FetchFn = (_, init) => {
+			calls.push(JSON.parse(init.body as string));
+			const body = bodies[calls.length - 1];
+			return Promise.resolve(Response.json(body));
+		};
+		return { fetchFn, calls };
+	};
+
+	test("adds the service, continues, and parses the professionals", async () => {
+		const { fetchFn, calls } = sequence([initialize, addService, employees]);
+
+		const result = await createFreshaService(fetchFn).listEmployees(
+			slug,
+			"sv:18605549",
+		);
+
+		expect(result).toEqual([
+			{ id: 5236325, name: "Sergio" },
+			{ id: 3182031, name: "Elvis" },
+		]);
+		expect(calls.map((c) => c.operationName)).toEqual([
+			"BookingFlow_Initialize_Mutation",
+			"BookingFlow_ActionButtonPressed_Mutation",
+			"BookingFlow_ActionButtonPressed_Mutation",
+		]);
+		const cartId = initialize.data.bookingFlowInitialize.cartId;
+		expect(calls[1]?.variables).toMatchObject({ cartId });
+		expect(calls[1]?.variables.id).toContain(
+			"onScreenServicesServiceVariantAdd",
+		);
+		expect(calls[1]?.variables.id).toContain("sv:18605549");
+		expect(calls[2]?.variables).toMatchObject({ cartId });
+		expect(calls[2]?.variables.id).toContain("onScreenServicesContinue");
+	});
+
+	test("fails when the variant is not in the catalogue", async () => {
+		const { fetchFn, calls } = sequence([initialize]);
+
+		const result = await createFreshaService(fetchFn).listEmployees(
+			slug,
+			"sv:0",
+		);
+
+		expect(result).toMatchObject({ kind: "graphql" });
+		expect(calls).toHaveLength(1);
+	});
+
+	test("fails when Fresha rejects an action with an error toast", async () => {
+		const rejected = {
+			data: {
+				bookingFlowActionButtonPressed: {
+					...addService.data.bookingFlowActionButtonPressed,
+					toasts: [{ __typename: "BookingFlowToastError" }],
+				},
+			},
+		};
+		const { fetchFn } = sequence([initialize, rejected]);
+
+		const result = await createFreshaService(fetchFn).listEmployees(
+			slug,
+			"sv:18605549",
+		);
+
+		expect(result).toBeInstanceOf(FreshaError);
+	});
+
+	test("propagates transport errors from any step", async () => {
+		const { fetchFn } = sequence([
+			initialize,
+			{ data: null, errors: [{ message: "boom" }] },
+		]);
+
+		const result = await createFreshaService(fetchFn).listEmployees(
+			slug,
+			"sv:18605549",
+		);
+
+		expect(result).toMatchObject({
+			kind: "graphql",
+			message: expect.stringContaining("boom"),
+		});
 	});
 });
