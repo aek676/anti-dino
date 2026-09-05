@@ -18,6 +18,10 @@ export const FreshaModel = {
 		duration: t.Nullable(t.String()),
 		price: t.Nullable(t.String()),
 	}),
+	employee: t.Object({
+		id: t.Number(),
+		name: t.String(),
+	}),
 	error: t.Object({
 		message: t.String(),
 		kind: t.Union([

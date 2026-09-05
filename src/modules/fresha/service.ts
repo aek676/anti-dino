@@ -44,6 +44,23 @@ type InitializeResult = {
 	};
 };
 
+type EmployeeScreen = {
+	employees: {
+		__typename: string;
+		name?: string;
+		action: { id: string } | null;
+	}[];
+};
+
+type ActionResult = {
+	bookingFlowActionButtonPressed: {
+		cartId: string;
+		toasts: { __typename: string }[];
+		screenServices: { continueAction?: { id: string } };
+		screenEmployee: Partial<EmployeeScreen>;
+	};
+};
+
 const CAPABILITIES = [
 	"SERVICE_ADDONS",
 	"CONFIRMATION",
@@ -83,6 +100,19 @@ export const parseServices = (
 			];
 		}),
 	);
+
+export const parseEmployees = (
+	screen: EmployeeScreen,
+): FreshaModel["employee"][] =>
+	screen.employees.flatMap((tile) => {
+		if (tile.__typename !== "BookingFlowScreenEmployeeTileEmployee") return [];
+		if (!tile.action || !tile.name) return [];
+
+		const { employeeId } = parseActionId(tile.action.id);
+		return typeof employeeId === "number"
+			? [{ id: employeeId, name: tile.name }]
+			: [];
+	});
 
 export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 	const call = async <T>(
@@ -124,6 +154,20 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 		return body.data;
 	};
 
+	const press = async (actionId: string, cartId: string) => {
+		const data = await call<ActionResult>("actionButtonPressed", {
+			id: actionId,
+			cartId,
+			shouldAutoContinue: true,
+			withRecommendedServices: false,
+		});
+		if (data instanceof FreshaError) return data;
+		const result = data.bookingFlowActionButtonPressed;
+		return result.toasts.some((t) => t.__typename === "BookingFlowToastError")
+			? new FreshaError("action rejected by Fresha", "graphql")
+			: result;
+	};
+
 	const initialize = async (locationSlug: string) => {
 		const data = await call<InitializeResult>("initialize", {
 			withRecommendedServices: false,
@@ -152,5 +196,42 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 			: parseServices(result.screenServices);
 	};
 
-	return { listServices };
+	const listEmployees = async (
+		locationSlug: string,
+		variantId: string,
+	): Promise<FreshaModel["employee"][] | FreshaError> => {
+		const init = await initialize(locationSlug);
+		if (init instanceof FreshaError) return init;
+
+		const addAction = init.screenServices.categories
+			.flatMap((category) => category.items)
+			.find(
+				(item) =>
+					item.secondaryAction &&
+					parseActionId(item.secondaryAction.id).bookableId === variantId,
+			)?.secondaryAction;
+		if (!addAction)
+			return new FreshaError(`service ${variantId} not found`, "graphql");
+
+		const added = await press(addAction.id, init.cartId);
+		if (added instanceof FreshaError) return added;
+
+		const continueAction = added.screenServices.continueAction;
+		if (!continueAction)
+			return new FreshaError(
+				"services screen has no continue action",
+				"graphql",
+			);
+
+		const employees = await press(continueAction.id, init.cartId);
+		if (employees instanceof FreshaError) return employees;
+
+		const tiles = employees.screenEmployee.employees;
+
+		return tiles
+			? parseEmployees({ employees: tiles })
+			: new FreshaError("employee screen not reached", "graphql");
+	};
+
+	return { listServices, listEmployees };
 };
