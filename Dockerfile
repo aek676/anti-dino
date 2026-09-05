@@ -1,4 +1,4 @@
-FROM oven/bun:1.4.1-slim AS base
+FROM oven/bun:1.4.2-slim AS base
 
 FROM --platform=$BUILDPLATFORM base AS deps
 WORKDIR /app
