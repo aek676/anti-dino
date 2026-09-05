@@ -84,12 +84,14 @@
 								"selector": {
 									"kind": "objectLiteralProperty"
 								},
+								"match": "__typename|(.*)",
 								"formats": ["camelCase", "snake_case"]
 							},
 							{
 								"selector": {
 									"kind": "typeProperty"
 								},
+								"match": "__typename|(.*)",
 								"formats": ["camelCase", "snake_case"]
 							}
 						]
