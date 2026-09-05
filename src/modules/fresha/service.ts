@@ -19,6 +19,8 @@ const OPERATIONS = {
 
 type Operation = keyof typeof OPERATIONS;
 
+export type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
+
 type GraphqlResponse<T> = {
 	data: T | null;
 	errors?: { message: string }[];
@@ -82,7 +84,7 @@ export const parseServices = (
 		}),
 	);
 
-export const createFreshaService = (fetchFn: typeof fetch = fetch) => {
+export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 	const call = async <T>(
 		operation: Operation,
 		variables: Record<string, unknown>,
@@ -114,7 +116,7 @@ export const createFreshaService = (fetchFn: typeof fetch = fetch) => {
 		if (body.errors?.length || body.data === null) {
 			const message =
 				body.errors?.map((e) => e.message).join("; ") ?? "no data";
-			const kind = /persisted|not found/i.test(message)
+			const kind = /persisted ?query/i.test(message)
 				? "unknown-operation"
 				: "graphql";
 			return new FreshaError(`${name}: ${message}`, kind);
@@ -152,5 +154,3 @@ export const createFreshaService = (fetchFn: typeof fetch = fetch) => {
 
 	return { listServices };
 };
-
-export type FreshaService = ReturnType<typeof createFreshaService>;
