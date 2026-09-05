@@ -1,13 +1,13 @@
 FROM oven/bun:1.4.2-slim AS base
 
-FROM --platform=$BUILDPLATFORM base AS deps
 WORKDIR /app
+
+FROM --platform=$BUILDPLATFORM base AS deps
 
 COPY package.json bun.lock ./
 RUN bun ci
 
 FROM --platform=$BUILDPLATFORM base AS builder
-WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json tsconfig.json ./
