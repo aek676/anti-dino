@@ -1,0 +1,380 @@
+{
+	"data": {
+		"bookingFlowInitialize": {
+			"cartId": "1ff9d068-44b6-4677-a7da-350f111796b8",
+			"screen": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenAllEmployees": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenConfirm": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenCustomerBlocked": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenEmployee": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenFirstVisit": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenGuestsAndServices": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenMultiEmployee": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenPatchTest": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenSuccess": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenTime": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenUnrecoverableError": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenWaitlistConfirm": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenWaitlistFirstVisit": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"screenWaitlistSetup": {
+				"__typename": "BookingFlowScreenServices"
+			},
+			"modal": null,
+			"toasts": [],
+			"layout": {
+				"canExit": true,
+				"cartSummaryBar": null,
+				"accessoryBars": null,
+				"breadcrumbs": [
+					{
+						"isDisabled": true,
+						"label": "Services",
+						"state": "CURRENT",
+						"action": null
+					},
+					{
+						"isDisabled": true,
+						"label": "Professional",
+						"state": "NEXT",
+						"action": null
+					},
+					{
+						"isDisabled": true,
+						"label": "Time",
+						"state": "NEXT",
+						"action": null
+					},
+					{
+						"isDisabled": true,
+						"label": "Confirm",
+						"state": "NEXT",
+						"action": null
+					}
+				],
+				"cart": {
+					"address": "Bulevar Ciudad de Vícar, 576, La Gangosa, Andalucía",
+					"avatarUrl": "https://images.fresha.com/locations/location-profile-images/1324442/5297793/a62b4831-860a-4c83-9881-3fa71b51ab5e-Laclinica-ES-Andaluca-LaGangosa-Fresha.jpg?class=thumb",
+					"name": "Laclinica",
+					"priceTotalLabel": "Total",
+					"rating": 0,
+					"reviewsCount": 0,
+					"slug": "laclinica-la-gangosa-bulevar-ciudad-de-vicar-gg4e0gad",
+					"discountsAndRewards": null,
+					"waitlistDateTimeRanges": null,
+					"dateFormatted": null,
+					"taxTotal": null,
+					"timeRangeFormatted": null,
+					"payAtVenue": null,
+					"payAtVenueLabel": null,
+					"payNow": null,
+					"payNowLabel": null,
+					"taxTotalLabel": null,
+					"serviceCharges": null,
+					"attendees": [
+						{
+							"name": null,
+							"items": []
+						}
+					],
+					"priceTotal": {
+						"formatted": "free",
+						"type": "FIXED"
+					}
+				}
+			},
+			"screenServices": {
+				"__typename": "BookingFlowScreenServices",
+				"sectionCurrentAttendee": null,
+				"description": null,
+				"title": "Select services",
+				"sectionSelectedEmployee": null,
+				"sectionUpselling": {
+					"tiles": [
+						{
+							"__typename": "BookingFlowUpsellingItemWithAction",
+							"caption": "Book for yourself and others",
+							"title": "Group appointments",
+							"type": "GROUP_APPOINTMENT",
+							"id": "[{\"type\":\"onScreenServicesGroupSet\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					],
+					"title": "Try something else"
+				},
+				"backAction": null,
+				"continueAction": {
+					"id": "[{\"type\":\"onScreenServicesContinue\",\"shouldSkipEmployeeSelectionOnce\":true,\"soloEmployeeName\":null},\"1394665\"]",
+					"isDisabled": true,
+					"label": "Continue",
+					"optimisticHint": null
+				},
+				"continueButton": {
+					"intent": "ADVANCE",
+					"isDisabled": true,
+					"label": "Continue",
+					"action": {
+						"id": "[{\"type\":\"onScreenServicesContinue\",\"shouldSkipEmployeeSelectionOnce\":true,\"soloEmployeeName\":null},\"1394665\"]",
+						"optimisticHint": null
+					}
+				},
+				"categories": [
+					{
+						"description": null,
+						"id": "3483238",
+						"name": "Barbering",
+						"items": [
+							{
+								"caption": "30 mins",
+								"description": "Renueva tu imagen con un corte de pelo adaptado a tu estilo y personalidad. Un servicio profesional pensado para quienes buscan un cambio fresco o mantener su look, siempre realizado con atención al detalle y cuidado. Siéntete cómodo y seguro con un acabado impecable.",
+								"discount": null,
+								"isSelected": false,
+								"name": "Corte de pelo",
+								"price": {
+									"formatted": "from €10"
+								},
+								"priceWithoutDiscounts": null,
+								"membershipChipButton": null,
+								"membershipUpsellingCallout": null,
+								"packageUpsellingCallout": null,
+								"secondaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:18605549\",\"catalogId\":\"s:16131271\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								},
+								"primaryAction": {
+									"id": "[{\"type\":\"onScreenServicesModalServiceOpen\",\"catalogId\":\"s:16131271\",\"serviceVariants\":[{\"id\":\"sv:18605549\",\"requiresPatchTest\":false}],\"memberships\":[],\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Open service details",
+									"optimisticHint": {
+										"direction": "PRESENT",
+										"target": {
+											"__typename": "BookingFlowServiceModalOptimisticHintTarget",
+											"serviceContentHints": []
+										}
+									}
+								}
+							},
+							{
+								"caption": "45 mins",
+								"description": "Renueva tu estilo y luce siempre impecable con un corte de pelo y barba realizado por profesionales. Disfruta de una experiencia cuidada que te ayudará a verte y sentirte mejor en tu día a día. Atención personalizada para un resultado fresco y favorecedor.",
+								"discount": null,
+								"isSelected": false,
+								"name": "Corte de pelo y  barba",
+								"price": {
+									"formatted": "€16"
+								},
+								"priceWithoutDiscounts": null,
+								"membershipChipButton": null,
+								"membershipUpsellingCallout": null,
+								"packageUpsellingCallout": null,
+								"secondaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:18605548\",\"catalogId\":\"s:16131270\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								},
+								"primaryAction": {
+									"id": "[{\"type\":\"onScreenServicesModalServiceOpen\",\"catalogId\":\"s:16131270\",\"serviceVariants\":[{\"id\":\"sv:18605548\",\"requiresPatchTest\":false}],\"memberships\":[],\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Open service details",
+									"optimisticHint": {
+										"direction": "PRESENT",
+										"target": {
+											"__typename": "BookingFlowServiceModalOptimisticHintTarget",
+											"serviceContentHints": []
+										}
+									}
+								}
+							},
+							{
+								"caption": "45 mins",
+								"description": "Disfruta de un cambio de look fresco y masculino con nuestro servicio de corte de pelo, barba y cejas. Nuestro equipo de expertos te brindará un estilo personalizado que resalta tu mejor versión, cuidando cada detalle para que te sientas seguro y renovado.",
+								"discount": null,
+								"isSelected": false,
+								"name": "CORTE DE PELO + BARBA + CEJAS",
+								"price": {
+									"formatted": "€18"
+								},
+								"priceWithoutDiscounts": null,
+								"membershipChipButton": null,
+								"membershipUpsellingCallout": null,
+								"packageUpsellingCallout": null,
+								"secondaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:28894481\",\"catalogId\":\"s:25265464\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								},
+								"primaryAction": {
+									"id": "[{\"type\":\"onScreenServicesModalServiceOpen\",\"catalogId\":\"s:25265464\",\"serviceVariants\":[{\"id\":\"sv:28894481\",\"requiresPatchTest\":false}],\"memberships\":[],\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Open service details",
+									"optimisticHint": {
+										"direction": "PRESENT",
+										"target": {
+											"__typename": "BookingFlowServiceModalOptimisticHintTarget",
+											"serviceContentHints": []
+										}
+									}
+								}
+							},
+							{
+								"caption": "30 mins",
+								"description": "Este servicio se realizara con cuchilla",
+								"discount": null,
+								"isSelected": false,
+								"name": "Corte de pelo con cejas ",
+								"price": {
+									"formatted": "€12"
+								},
+								"priceWithoutDiscounts": null,
+								"membershipChipButton": null,
+								"membershipUpsellingCallout": null,
+								"packageUpsellingCallout": null,
+								"secondaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:18658274\",\"catalogId\":\"s:16176495\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								},
+								"primaryAction": {
+									"id": "[{\"type\":\"onScreenServicesModalServiceOpen\",\"catalogId\":\"s:16176495\",\"serviceVariants\":[{\"id\":\"sv:18658274\",\"requiresPatchTest\":false}],\"memberships\":[],\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Open service details",
+									"optimisticHint": {
+										"direction": "PRESENT",
+										"target": {
+											"__typename": "BookingFlowServiceModalOptimisticHintTarget",
+											"serviceContentHints": []
+										}
+									}
+								}
+							},
+							{
+								"caption": "45 mins",
+								"description": "Realza tu mirada con unas cejas definidas y limpias gracias a una técnica rápida y precisa. La depilación con cera proporciona una forma armoniosa y un acabado pulido que resalta la expresión natural de tu rostro, ideal para quienes buscan resultados duraderos en su rutina de cuidado personal.",
+								"discount": null,
+								"isSelected": false,
+								"name": "Corte de pelo + Cejas con cera",
+								"price": {
+									"formatted": "€16"
+								},
+								"priceWithoutDiscounts": null,
+								"membershipChipButton": null,
+								"membershipUpsellingCallout": null,
+								"packageUpsellingCallout": null,
+								"secondaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:25444780\",\"catalogId\":\"s:22207999\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								},
+								"primaryAction": {
+									"id": "[{\"type\":\"onScreenServicesModalServiceOpen\",\"catalogId\":\"s:22207999\",\"serviceVariants\":[{\"id\":\"sv:25444780\",\"requiresPatchTest\":false}],\"memberships\":[],\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Open service details",
+									"optimisticHint": {
+										"direction": "PRESENT",
+										"target": {
+											"__typename": "BookingFlowServiceModalOptimisticHintTarget",
+											"serviceContentHints": []
+										}
+									}
+								}
+							},
+							{
+								"caption": "30 mins",
+								"description": null,
+								"discount": null,
+								"isSelected": false,
+								"name": "Corte con DISEÑO ( DIBUJO )",
+								"price": {
+									"formatted": "from €12"
+								},
+								"priceWithoutDiscounts": null,
+								"membershipChipButton": null,
+								"membershipUpsellingCallout": null,
+								"packageUpsellingCallout": null,
+								"secondaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:18619162\",\"catalogId\":\"s:16142990\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								},
+								"primaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:18619162\",\"catalogId\":\"s:16142990\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								}
+							},
+							{
+								"caption": "15 mins",
+								"description": null,
+								"discount": null,
+								"isSelected": false,
+								"name": "Barba",
+								"price": {
+									"formatted": "€8"
+								},
+								"priceWithoutDiscounts": null,
+								"membershipChipButton": null,
+								"membershipUpsellingCallout": null,
+								"packageUpsellingCallout": null,
+								"secondaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:18605547\",\"catalogId\":\"s:16131269\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								},
+								"primaryAction": {
+									"id": "[{\"type\":\"onScreenServicesServiceVariantAdd\",\"bookableId\":\"sv:18605547\",\"catalogId\":\"s:16131269\",\"membershipId\":null,\"requiresPatchTest\":false,\"orderId\":0,\"employeeRequired\":true},\"1394665\"]",
+									"isDisabled": false,
+									"label": "Add service",
+									"optimisticHint": null
+								}
+							}
+						]
+					}
+				]
+			}
+		}
+	},
+	"extensions": {
+		"unleashImpressions": [
+			{
+				"name": "B2C_GATEWAY_BOOKING_FLOW_TIME_DEFAULT_FIRST_AVAILABLE",
+				"isEnabled": false
+			}
+		]
+	}
+}
