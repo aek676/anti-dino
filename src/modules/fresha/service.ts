@@ -75,6 +75,12 @@ type ActionResult = {
 	};
 };
 
+const Typename = {
+	employeeTile: "BookingFlowScreenEmployeeTileEmployee",
+	dayAvailable: "BookingFlowScreenTimeDayAvailable",
+	toastError: "BookingFlowToastError",
+} as const;
+
 const CAPABILITIES = [
 	"SERVICE_ADDONS",
 	"CONFIRMATION",
@@ -119,7 +125,7 @@ export const parseEmployees = (
 	screen: EmployeeScreen,
 ): FreshaModel["employee"][] =>
 	screen.employees.flatMap((tile) => {
-		if (tile.__typename !== "BookingFlowScreenEmployeeTileEmployee") return [];
+		if (tile.__typename !== Typename.employeeTile) return [];
 		if (!tile.action || !tile.name) return [];
 
 		const { employeeId } = parseActionId(tile.action.id);
@@ -132,7 +138,7 @@ export const parseSlots = (
 	date: string,
 	day: TimeScreen["day"],
 ): FreshaModel["slot"][] =>
-	day.__typename === "BookingFlowScreenTimeDayAvailable"
+	day.__typename === Typename.dayAvailable
 		? (day.timeslots ?? []).map((slot) => ({ date, time: slot.time }))
 		: [];
 
@@ -185,7 +191,7 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 		});
 		if (data instanceof FreshaError) return data;
 		const result = data.bookingFlowActionButtonPressed;
-		return result.toasts.some((t) => t.__typename === "BookingFlowToastError")
+		return result.toasts.some((t) => t.__typename === Typename.toastError)
 			? new FreshaError("action rejected by Fresha", "graphql")
 			: result;
 	};
