@@ -5,10 +5,13 @@ import {
 	type FetchFn,
 	parseEmployees,
 	parseServices,
+	parseSlots,
 } from "@/modules/fresha/service";
 import addService from "./fixtures/add-service.json";
+import day from "./fixtures/day.json";
 import employees from "./fixtures/employees.json";
 import initialize from "./fixtures/initialize.json";
+import time from "./fixtures/time.json";
 
 const respond =
 	(body: unknown, status = 200): FetchFn =>
@@ -191,5 +194,136 @@ describe("listEmployees", () => {
 			kind: "graphql",
 			message: expect.stringContaining("boom"),
 		});
+	});
+});
+
+describe("parseSlots", () => {
+	test("returns every timeslot of an available day with its date", () => {
+		const slots = parseSlots(
+			"2026-09-08",
+			day.data.bookingFlowActionButtonPressed.screenTime.day,
+		);
+
+		expect(slots).toHaveLength(14);
+		expect(slots[0]).toEqual({ date: "2026-09-08", time: "12:15" });
+	});
+
+	test("returns nothing for a fully booked day", () => {
+		const slots = parseSlots(
+			"2026-09-05",
+			time.data.bookingFlowActionButtonPressed.screenTime.day,
+		);
+
+		expect(slots).toEqual([]);
+	});
+});
+
+describe("listSlots", () => {
+	const router = () => {
+		const pressed: Record<string, unknown>[] = [];
+		const fetchFn: FetchFn = (_, init) => {
+			const body = JSON.parse(init.body as string);
+			if (body.operationName === "BookingFlow_Initialize_Mutation") {
+				return Promise.resolve(Response.json(initialize));
+			}
+			const [action] = JSON.parse(body.variables.id);
+			pressed.push(action);
+			const responses: Record<string, unknown> = {
+				onScreenServicesServiceVariantAdd: addService,
+				onScreenServicesContinue: employees,
+				onScreenEmployeeSet: employees,
+				onScreenEmployeeContinue: time,
+				onScreenTimeDaySelectorDateSet: day,
+			};
+			return Promise.resolve(Response.json(responses[action.type]));
+		};
+		return { fetchFn, pressed };
+	};
+
+	test("selects the employee and opens only the available days", async () => {
+		const { fetchFn, pressed } = router();
+
+		const result = await createFreshaService(fetchFn).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			31,
+		);
+
+		expect(pressed.map((a) => a.type)).toEqual([
+			"onScreenServicesServiceVariantAdd",
+			"onScreenServicesContinue",
+			"onScreenEmployeeSet",
+			"onScreenEmployeeContinue",
+			...Array<string>(24).fill("onScreenTimeDaySelectorDateSet"),
+		]);
+		expect(pressed[2]).toMatchObject({ employeeId: 3182031 });
+		expect(pressed[4]).toMatchObject({ date: "2026-09-08" });
+
+		expect(result).toHaveLength(24 * 14);
+		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
+	});
+
+	test("looks only daysAhead days into the future", async () => {
+		const { fetchFn, pressed } = router();
+
+		const result = await createFreshaService(fetchFn).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			5,
+		);
+
+		expect(
+			pressed.filter((a) => a.type === "onScreenTimeDaySelectorDateSet"),
+		).toEqual([
+			expect.objectContaining({ date: "2026-09-08" }),
+			expect.objectContaining({ date: "2026-09-09" }),
+		]);
+		expect(result).toHaveLength(2 * 14);
+	});
+
+	test("fails when the employee is not offered for the service", async () => {
+		const { fetchFn, pressed } = router();
+
+		const result = await createFreshaService(fetchFn).listSlots(
+			slug,
+			"sv:18605549",
+			1,
+			31,
+		);
+
+		expect(result).toMatchObject({
+			kind: "graphql",
+			message: "employee 1 not found",
+		});
+		expect(pressed).toHaveLength(2);
+	});
+
+	test("stops at the first day Fresha rejects", async () => {
+		const { fetchFn, pressed } = router();
+		let opened = 0;
+		const failing: FetchFn = (url, init) => {
+			const body = JSON.parse(init.body as string);
+			const action = body.variables.id ? JSON.parse(body.variables.id)[0] : {};
+			if (action.type === "onScreenTimeDaySelectorDateSet" && ++opened === 2) {
+				return Promise.resolve(
+					Response.json({ data: null, errors: [{ message: "boom" }] }),
+				);
+			}
+			return fetchFn(url, init);
+		};
+
+		const result = await createFreshaService(failing).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			31,
+		);
+
+		expect(result).toBeInstanceOf(FreshaError);
+		expect(
+			pressed.filter((a) => a.type === "onScreenTimeDaySelectorDateSet"),
+		).toHaveLength(1);
 	});
 });
