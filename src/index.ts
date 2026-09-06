@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
 import { closeDatabase, db } from "@/utils/db";
 import { env } from "@/utils/env";
@@ -11,6 +12,8 @@ const app = new Elysia()
 		}),
 	)
 	.use(health(db))
+	.decorate("db", db)
+	.use(fresha)
 	.onStop(() => {
 		closeDatabase(db);
 	})

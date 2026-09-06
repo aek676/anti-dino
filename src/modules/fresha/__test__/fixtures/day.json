@@ -1,0 +1,972 @@
+{
+	"data": {
+		"bookingFlowActionButtonPressed": {
+			"cartId": "040e6138-b557-4500-ab16-23a3395b54f2",
+			"screen": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenAllEmployees": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenConfirm": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenCustomerBlocked": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenEmployee": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenFirstVisit": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenGuestsAndServices": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenMultiEmployee": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenPatchTest": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenServices": {},
+			"screenSuccess": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenUnrecoverableError": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenWaitlistConfirm": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenWaitlistFirstVisit": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"screenWaitlistSetup": {
+				"__typename": "BookingFlowScreenTime"
+			},
+			"modal": null,
+			"toasts": [],
+			"layout": {
+				"canExit": true,
+				"accessoryBars": null,
+				"breadcrumbs": [
+					{
+						"isDisabled": false,
+						"label": "Services",
+						"state": "PREVIOUS",
+						"action": {
+							"id": "[{\"type\":\"onBackToServices\"},\"1394665\"]",
+							"optimisticHint": {
+								"direction": "POP",
+								"target": {
+									"__typename": "BookingFlowScreenServicesOptimisticHintTarget"
+								}
+							}
+						}
+					},
+					{
+						"isDisabled": false,
+						"label": "Professional",
+						"state": "PREVIOUS",
+						"action": {
+							"id": "[{\"type\":\"onBackToEmployees\"},\"1394665\"]",
+							"optimisticHint": {
+								"direction": "POP",
+								"target": {
+									"__typename": "BookingFlowScreenEmployeeOptimisticHintTarget"
+								}
+							}
+						}
+					},
+					{
+						"isDisabled": true,
+						"label": "Time",
+						"state": "CURRENT",
+						"action": null
+					},
+					{
+						"isDisabled": true,
+						"label": "Confirm",
+						"state": "NEXT",
+						"action": null
+					}
+				],
+				"cartSummaryBar": {
+					"cartPreview": null,
+					"header": "from €10",
+					"caption": "1 item  •  30 mins"
+				},
+				"cart": {
+					"address": "Bulevar Ciudad de Vícar, 576, La Gangosa, Andalucía",
+					"avatarUrl": "https://images.fresha.com/locations/location-profile-images/1324442/5297793/a62b4831-860a-4c83-9881-3fa71b51ab5e-Laclinica-ES-Andaluca-LaGangosa-Fresha.jpg?class=thumb",
+					"name": "Laclinica",
+					"priceTotalLabel": "Total",
+					"rating": 0,
+					"reviewsCount": 0,
+					"slug": "laclinica-la-gangosa-bulevar-ciudad-de-vicar-gg4e0gad",
+					"discountsAndRewards": null,
+					"waitlistDateTimeRanges": null,
+					"dateFormatted": null,
+					"taxTotal": null,
+					"timeRangeFormatted": null,
+					"payAtVenue": null,
+					"payAtVenueLabel": null,
+					"payNow": null,
+					"payNowLabel": null,
+					"taxTotalLabel": null,
+					"serviceCharges": null,
+					"priceTotal": {
+						"formatted": "from €10",
+						"type": "STARTS_AT"
+					},
+					"attendees": [
+						{
+							"name": null,
+							"items": [
+								{
+									"membership": null,
+									"serviceAddons": null,
+									"rewardHint": null,
+									"price": {
+										"formatted": "from €10"
+									},
+									"priceWithoutDiscounts": null,
+									"name": "Corte de pelo",
+									"captionStyled": {
+										"fallbackText": "30 mins with Sergio",
+										"interpolations": [
+											{
+												"action": {
+													"action": {
+														"id": "[{\"type\":\"onScreenTimeModalEmployeeOpen\",\"cartItemId\":\"1:s:16131271\"},\"1394665\"]",
+														"optimisticHint": {
+															"direction": "PRESENT",
+															"target": {
+																"__typename": "BookingFlowModalEmployeeOptimisticHintTarget"
+															}
+														}
+													}
+												},
+												"id": "employee",
+												"text": "Sergio",
+												"textAccent": null
+											}
+										],
+										"text": "30 mins with &{employee}",
+										"version": 1
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			"screenTime": {
+				"__typename": "BookingFlowScreenTime",
+				"datesTitle": "Select a date",
+				"timeslotsTitle": "Pick a time",
+				"description": null,
+				"title": "Select date and time",
+				"patchTestCalloutBanner": null,
+				"continueAction": {
+					"id": "[{\"type\":\"onScreenTimeContinue\"},\"1394665\"]",
+					"isDisabled": true,
+					"label": "Continue",
+					"optimisticHint": null
+				},
+				"backAction": {
+					"id": "[{\"type\":\"onBack\"},\"1394665\"]",
+					"isDisabled": false,
+					"label": "Back",
+					"optimisticHint": {
+						"direction": "POP",
+						"target": {
+							"__typename": "BookingFlowScreenEmployeeOptimisticHintTarget"
+						}
+					}
+				},
+				"continueButton": {
+					"intent": "ADVANCE",
+					"isDisabled": true,
+					"label": "Continue",
+					"action": {
+						"id": "[{\"type\":\"onScreenTimeContinue\"},\"1394665\"]",
+						"optimisticHint": null
+					}
+				},
+				"employeeSelection": {
+					"employees": [
+						{
+							"image": {
+								"url": "https://cdn-partners-api.fresha.com/employee-avatars/processed/1535795/thumb/b381db88-f924-4927-b24c-ed5ce65b90ad-DSC01754.jpg"
+							},
+							"initials": "S"
+						}
+					],
+					"primaryAction": {
+						"id": "[{\"type\":\"onScreenTimeModalEmployeeOpen\",\"cartItemId\":\"1:s:16131271\"},\"1394665\"]",
+						"isDisabled": false,
+						"label": "Sergio",
+						"optimisticHint": {
+							"direction": "PRESENT",
+							"target": {
+								"__typename": "BookingFlowModalEmployeeOptimisticHintTarget"
+							}
+						}
+					},
+					"remainingNumberOfEmployees": 0
+				},
+				"dates": [
+					{
+						"date": {
+							"dayNameShort": "Sat",
+							"dayOfMonth": 5,
+							"formattedDate": "Sat, 5 Sept 2026",
+							"iso": "2026-09-05T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-05\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sun",
+							"dayOfMonth": 6,
+							"formattedDate": "Sun, 6 Sept 2026",
+							"iso": "2026-09-06T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-06\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Mon",
+							"dayOfMonth": 7,
+							"formattedDate": "Mon, 7 Sept 2026",
+							"iso": "2026-09-07T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-07\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Tue",
+							"dayOfMonth": 8,
+							"formattedDate": "Tue, 8 Sept 2026",
+							"iso": "2026-09-08T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": true,
+						"action": null
+					},
+					{
+						"date": {
+							"dayNameShort": "Wed",
+							"dayOfMonth": 9,
+							"formattedDate": "Wed, 9 Sept 2026",
+							"iso": "2026-09-09T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-09\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Thu",
+							"dayOfMonth": 10,
+							"formattedDate": "Thu, 10 Sept 2026",
+							"iso": "2026-09-10T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-10\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Fri",
+							"dayOfMonth": 11,
+							"formattedDate": "Fri, 11 Sept 2026",
+							"iso": "2026-09-11T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-11\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sat",
+							"dayOfMonth": 12,
+							"formattedDate": "Sat, 12 Sept 2026",
+							"iso": "2026-09-12T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-12\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sun",
+							"dayOfMonth": 13,
+							"formattedDate": "Sun, 13 Sept 2026",
+							"iso": "2026-09-13T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-13\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Mon",
+							"dayOfMonth": 14,
+							"formattedDate": "Mon, 14 Sept 2026",
+							"iso": "2026-09-14T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-14\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Tue",
+							"dayOfMonth": 15,
+							"formattedDate": "Tue, 15 Sept 2026",
+							"iso": "2026-09-15T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-15\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Wed",
+							"dayOfMonth": 16,
+							"formattedDate": "Wed, 16 Sept 2026",
+							"iso": "2026-09-16T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-16\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Thu",
+							"dayOfMonth": 17,
+							"formattedDate": "Thu, 17 Sept 2026",
+							"iso": "2026-09-17T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-17\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Fri",
+							"dayOfMonth": 18,
+							"formattedDate": "Fri, 18 Sept 2026",
+							"iso": "2026-09-18T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-18\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sat",
+							"dayOfMonth": 19,
+							"formattedDate": "Sat, 19 Sept 2026",
+							"iso": "2026-09-19T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-19\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sun",
+							"dayOfMonth": 20,
+							"formattedDate": "Sun, 20 Sept 2026",
+							"iso": "2026-09-20T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-20\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Mon",
+							"dayOfMonth": 21,
+							"formattedDate": "Mon, 21 Sept 2026",
+							"iso": "2026-09-21T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-21\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Tue",
+							"dayOfMonth": 22,
+							"formattedDate": "Tue, 22 Sept 2026",
+							"iso": "2026-09-22T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-22\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Wed",
+							"dayOfMonth": 23,
+							"formattedDate": "Wed, 23 Sept 2026",
+							"iso": "2026-09-23T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": false,
+						"isLoading": false,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-23\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Thu",
+							"dayOfMonth": 24,
+							"formattedDate": "Thu, 24 Sept 2026",
+							"iso": "2026-09-24T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-24\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Fri",
+							"dayOfMonth": 25,
+							"formattedDate": "Fri, 25 Sept 2026",
+							"iso": "2026-09-25T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-25\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sat",
+							"dayOfMonth": 26,
+							"formattedDate": "Sat, 26 Sept 2026",
+							"iso": "2026-09-26T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-26\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sun",
+							"dayOfMonth": 27,
+							"formattedDate": "Sun, 27 Sept 2026",
+							"iso": "2026-09-27T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-27\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Mon",
+							"dayOfMonth": 28,
+							"formattedDate": "Mon, 28 Sept 2026",
+							"iso": "2026-09-28T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-28\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Tue",
+							"dayOfMonth": 29,
+							"formattedDate": "Tue, 29 Sept 2026",
+							"iso": "2026-09-29T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-29\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Wed",
+							"dayOfMonth": 30,
+							"formattedDate": "Wed, 30 Sept 2026",
+							"iso": "2026-09-30T00:00:00.000Z",
+							"monthAndYearFormatted": "September 2026",
+							"monthNameShort": "Sept"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-09-30\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Thu",
+							"dayOfMonth": 1,
+							"formattedDate": "Thu, 1 Oct 2026",
+							"iso": "2026-10-01T00:00:00.000Z",
+							"monthAndYearFormatted": "October 2026",
+							"monthNameShort": "Oct"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-10-01\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Fri",
+							"dayOfMonth": 2,
+							"formattedDate": "Fri, 2 Oct 2026",
+							"iso": "2026-10-02T00:00:00.000Z",
+							"monthAndYearFormatted": "October 2026",
+							"monthNameShort": "Oct"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-10-02\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sat",
+							"dayOfMonth": 3,
+							"formattedDate": "Sat, 3 Oct 2026",
+							"iso": "2026-10-03T00:00:00.000Z",
+							"monthAndYearFormatted": "October 2026",
+							"monthNameShort": "Oct"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-10-03\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Sun",
+							"dayOfMonth": 4,
+							"formattedDate": "Sun, 4 Oct 2026",
+							"iso": "2026-10-04T00:00:00.000Z",
+							"monthAndYearFormatted": "October 2026",
+							"monthNameShort": "Oct"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-10-04\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"date": {
+							"dayNameShort": "Mon",
+							"dayOfMonth": 5,
+							"formattedDate": "Mon, 5 Oct 2026",
+							"iso": "2026-10-05T00:00:00.000Z",
+							"monthAndYearFormatted": "October 2026",
+							"monthNameShort": "Oct"
+						},
+						"icon": false,
+						"isAvailableToBeBooked": true,
+						"isLoading": true,
+						"isSelected": false,
+						"action": {
+							"id": "[{\"type\":\"onScreenTimeDaySelectorDateSet\",\"date\":\"2026-10-05\"},\"1394665\"]",
+							"optimisticHint": null
+						}
+					}
+				],
+				"day": {
+					"__typename": "BookingFlowScreenTimeDayAvailable",
+					"sectionJoinWaitlist": {
+						"textFormattedStyled": {
+							"fallbackText": "Can’t find a suitable time? Join waitlist",
+							"interpolations": [
+								{
+									"action": {
+										"id": "[{\"type\":\"onScreenTimeWaitlist\",\"initialDate\":\"2026-09-08\"},\"1394665\"]",
+										"isDisabled": false,
+										"optimisticHint": null
+									},
+									"id": "linkToJoinWaitlist",
+									"text": "Join waitlist",
+									"textAccent": null
+								}
+							],
+							"text": "Can’t find a suitable time? &{linkToJoinWaitlist}",
+							"version": 1
+						}
+					},
+					"timeslots": [
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "12:15",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":44100,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "12:30",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":45000,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "12:45",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":45900,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "13:00",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":46800,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "13:15",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":47700,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "13:30",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":48600,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "17:30",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":63000,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "19:00",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":68400,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "19:15",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":69300,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "19:30",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":70200,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "19:45",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":71100,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "20:00",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":72000,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "20:15",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":72900,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						},
+						{
+							"discount": null,
+							"highDemandLabel": null,
+							"isSelected": false,
+							"price": null,
+							"priceWithoutDiscount": null,
+							"time": "20:30",
+							"action": {
+								"id": "[{\"type\":\"onScreenTimeSet\",\"date\":\"2026-09-08\",\"time\":73800,\"autoContinue\":false,\"pricesShownOnDay\":false},\"1394665\"]",
+								"optimisticHint": null
+							}
+						}
+					]
+				}
+			}
+		}
+	}
+}

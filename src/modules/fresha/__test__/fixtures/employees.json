@@ -1,0 +1,245 @@
+{
+	"data": {
+		"bookingFlowActionButtonPressed": {
+			"cartId": "040e6138-b557-4500-ab16-23a3395b54f2",
+			"screen": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenAllEmployees": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenConfirm": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenCustomerBlocked": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenFirstVisit": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenGuestsAndServices": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenMultiEmployee": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenPatchTest": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenServices": {},
+			"screenSuccess": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenTime": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenUnrecoverableError": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenWaitlistConfirm": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenWaitlistFirstVisit": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"screenWaitlistSetup": {
+				"__typename": "BookingFlowScreenEmployee"
+			},
+			"modal": null,
+			"toasts": [],
+			"layout": {
+				"canExit": true,
+				"accessoryBars": null,
+				"breadcrumbs": [
+					{
+						"isDisabled": false,
+						"label": "Services",
+						"state": "PREVIOUS",
+						"action": {
+							"id": "[{\"type\":\"onBackToServices\"},\"1394665\"]",
+							"optimisticHint": {
+								"direction": "POP",
+								"target": {
+									"__typename": "BookingFlowScreenServicesOptimisticHintTarget"
+								}
+							}
+						}
+					},
+					{
+						"isDisabled": true,
+						"label": "Professional",
+						"state": "CURRENT",
+						"action": null
+					},
+					{
+						"isDisabled": true,
+						"label": "Time",
+						"state": "NEXT",
+						"action": null
+					},
+					{
+						"isDisabled": true,
+						"label": "Confirm",
+						"state": "NEXT",
+						"action": null
+					}
+				],
+				"cartSummaryBar": {
+					"cartPreview": null,
+					"header": "from €10",
+					"caption": "1 item  •  30 mins"
+				},
+				"cart": {
+					"address": "Bulevar Ciudad de Vícar, 576, La Gangosa, Andalucía",
+					"avatarUrl": "https://images.fresha.com/locations/location-profile-images/1324442/5297793/a62b4831-860a-4c83-9881-3fa71b51ab5e-Laclinica-ES-Andaluca-LaGangosa-Fresha.jpg?class=thumb",
+					"name": "Laclinica",
+					"priceTotalLabel": "Total",
+					"rating": 0,
+					"reviewsCount": 0,
+					"slug": "laclinica-la-gangosa-bulevar-ciudad-de-vicar-gg4e0gad",
+					"discountsAndRewards": null,
+					"waitlistDateTimeRanges": null,
+					"dateFormatted": null,
+					"taxTotal": null,
+					"timeRangeFormatted": null,
+					"payAtVenue": null,
+					"payAtVenueLabel": null,
+					"payNow": null,
+					"payNowLabel": null,
+					"taxTotalLabel": null,
+					"serviceCharges": null,
+					"priceTotal": {
+						"formatted": "from €10",
+						"type": "STARTS_AT"
+					},
+					"attendees": [
+						{
+							"name": null,
+							"items": [
+								{
+									"membership": null,
+									"serviceAddons": null,
+									"rewardHint": null,
+									"price": {
+										"formatted": "from €10"
+									},
+									"priceWithoutDiscounts": null,
+									"name": "Corte de pelo",
+									"captionStyled": {
+										"fallbackText": "30 mins with any professional",
+										"interpolations": [],
+										"text": "30 mins with any professional",
+										"version": 1
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			"screenEmployee": {
+				"__typename": "BookingFlowScreenEmployee",
+				"description": null,
+				"title": "Select professional",
+				"employeesRecommended": null,
+				"employeesRecommendedSectionName": null,
+				"employeesSectionName": null,
+				"continueAction": {
+					"id": "[{\"type\":\"onScreenEmployeeContinue\"},\"1394665\"]",
+					"isDisabled": true,
+					"label": "Continue",
+					"optimisticHint": null
+				},
+				"backAction": {
+					"id": "[{\"type\":\"onBack\"},\"1394665\"]",
+					"isDisabled": false,
+					"label": "Back",
+					"optimisticHint": {
+						"direction": "POP",
+						"target": {
+							"__typename": "BookingFlowScreenServicesOptimisticHintTarget"
+						}
+					}
+				},
+				"employees": [
+					{
+						"__typename": "BookingFlowScreenEmployeeTileAction",
+						"caption": "Maximum availability",
+						"discount": null,
+						"icon": "ANY_EMPLOYEE",
+						"isDisabled": false,
+						"isSelected": false,
+						"price": null,
+						"title": "Any professional",
+						"action": {
+							"id": "[{\"type\":\"onScreenEmployeeSetAny\",\"autoContinue\":false},\"1394665\"]",
+							"optimisticHint": null
+						}
+					},
+					{
+						"__typename": "BookingFlowScreenEmployeeTileEmployee",
+						"avatar": {
+							"url": "https://cdn-partners-api.fresha.com/employee-avatars/processed/1535795/medium/b381db88-f924-4927-b24c-ed5ce65b90ad-DSC01754.jpg"
+						},
+						"caption": null,
+						"discount": null,
+						"isDisabled": false,
+						"isSelected": false,
+						"lastSeenLabel": null,
+						"name": "Sergio",
+						"previewText": "View profile",
+						"price": null,
+						"rating": null,
+						"action": {
+							"id": "[{\"type\":\"onScreenEmployeeSet\",\"employeeId\":5236325,\"autoContinue\":false},\"1394665\"]",
+							"optimisticHint": null
+						},
+						"previewAction": {
+							"isDisabled": false,
+							"action": {
+								"id": "[{\"type\":\"onScreenEmployeeViewProfile\",\"employeeId\":5236325},\"1394665\"]",
+								"optimisticHint": {
+									"direction": "PRESENT",
+									"target": {
+										"__typename": "BookingFlowModalEmployeeProfileOptimisticHintTarget"
+									}
+								}
+							}
+						}
+					},
+					{
+						"__typename": "BookingFlowScreenEmployeeTileEmployee",
+						"avatar": {
+							"url": "https://cdn-partners-api.fresha.com/employee-avatars/processed/1510507/medium/bc988fef-94d5-4804-b7ae-bd2678976ebd-DSC00385.jpg"
+						},
+						"caption": null,
+						"discount": null,
+						"isDisabled": false,
+						"isSelected": false,
+						"lastSeenLabel": null,
+						"name": "Elvis",
+						"previewText": "View profile",
+						"price": null,
+						"rating": null,
+						"action": {
+							"id": "[{\"type\":\"onScreenEmployeeSet\",\"employeeId\":3182031,\"autoContinue\":false},\"1394665\"]",
+							"optimisticHint": null
+						},
+						"previewAction": {
+							"isDisabled": false,
+							"action": {
+								"id": "[{\"type\":\"onScreenEmployeeViewProfile\",\"employeeId\":3182031},\"1394665\"]",
+								"optimisticHint": {
+									"direction": "PRESENT",
+									"target": {
+										"__typename": "BookingFlowModalEmployeeProfileOptimisticHintTarget"
+									}
+								}
+							}
+						}
+					}
+				]
+			}
+		}
+	}
+}
