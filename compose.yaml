@@ -1,13 +1,29 @@
+# Run through varlock so the ${VAR} references resolve from .env.schema/.env.local:
+#   NODE_ENV=production bunx varlock run -- docker compose up --build -d
 services:
   app:
     build: .
     image: anti-dino:latest
     restart: unless-stopped
-    env_file: .env.local
     environment:
       NODE_ENV: production
       PORT: "3000"
       DATABASE_PATH: /app/data/anti-dino.sqlite
+      LOG_LEVEL: ${LOG_LEVEL}
+      WEBHOOK_PATH: ${WEBHOOK_PATH}
+      PUBLIC_URL: ${PUBLIC_URL}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET}
+      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID}
+      FRESHA_LOCATION_ID: ${FRESHA_LOCATION_ID}
+      FRESHA_EMPLOYEE_ID: ${FRESHA_EMPLOYEE_ID}
+      FRESHA_SERVICE_ID: ${FRESHA_SERVICE_ID}
+      FRESHA_BOOKING_URL: ${FRESHA_BOOKING_URL}
+      CHECK_INTERVAL_MINUTES: ${CHECK_INTERVAL_MINUTES}
+      DAYS_AHEAD: ${DAYS_AHEAD}
+      MAX_DAYS_PER_CHECK: ${MAX_DAYS_PER_CHECK}
+      FRESHA_STEP_DELAY_MS: ${FRESHA_STEP_DELAY_MS}
+      FAILURE_ALERT_THRESHOLD: ${FAILURE_ALERT_THRESHOLD}
     ports:
       - "3000:3000"
     volumes:

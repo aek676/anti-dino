@@ -3,7 +3,7 @@ node_modules
 data
 dist
 .env*
-!.env.example
+!.env.schema
 .claude
 .agents
 *.sqlite*
