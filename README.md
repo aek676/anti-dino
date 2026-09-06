@@ -37,7 +37,7 @@ to the container via `compose.yaml`; the SQLite database lives in the
 `anti-dino-data` volume.
 
 ```bash
-NODE_ENV=production bunx varlock run -- docker compose up --build -d
+bunx varlock run -- docker compose up --build -d
 docker compose logs -f
 docker compose stop
 ```
