@@ -1,5 +1,5 @@
 import { Elysia, status, t } from "elysia";
-import { env } from "@/utils/env";
+import { ENV } from "varlock/env";
 import { FreshaError, FreshaModel } from "./model";
 import { createFreshaService } from "./service";
 
@@ -53,7 +53,7 @@ export const fresha = new Elysia({ name: "fresha", prefix: "/fresha" })
 				query.slug,
 				query.variantId,
 				query.employeeId,
-				env.DAYS_AHEAD,
+				ENV.DAYS_AHEAD,
 			);
 			return result instanceof FreshaError
 				? status(502, { message: result.message, kind: result.kind })
