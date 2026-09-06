@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run --watch src/index.ts | pino-pretty",
+    "dev": "bun run --watch src/modules/app/index.ts | pino-pretty",
     "start": "bun run src/index.ts",
     "build": "bun build --compile --minify --target bun --outfile dist/server src/index.ts",
     "build:linux-x64": "bun build --compile --minify --target bun-linux-x64 --outfile dist/server-linux-x64 src/index.ts",
