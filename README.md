@@ -33,8 +33,9 @@ secrets redacted from piped output.
 
 The image compiles the app to a single binary and runs it on a distroless base
 (no shell, no Bun runtime). Env is resolved on the host by Varlock and passed
-to the container via `compose.yaml`; the SQLite database lives in the
-`anti-dino-data` volume.
+to the container via `compose.yaml`. The binary embeds Varlock and validates that
+env against `.env.schema` on boot, refusing to start on a bad config. The SQLite
+database lives in the `anti-dino-data` volume.
 
 ```bash
 bunx varlock run -- docker compose up --build -d
