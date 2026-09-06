@@ -45,11 +45,24 @@ type InitializeResult = {
 };
 
 type EmployeeScreen = {
+	continueAction?: { id: string };
 	employees: {
 		__typename: string;
 		name?: string;
 		action: { id: string } | null;
 	}[];
+};
+
+type TimeScreen = {
+	dates: {
+		date: { iso: string };
+		isAvailableToBeBooked: boolean;
+		action: { id: string } | null;
+	}[];
+	day: {
+		__typename: string;
+		timeslots?: { time: string }[];
+	};
 };
 
 type ActionResult = {
@@ -58,6 +71,7 @@ type ActionResult = {
 		toasts: { __typename: string }[];
 		screenServices: { continueAction?: { id: string } };
 		screenEmployee: Partial<EmployeeScreen>;
+		screenTime: Partial<TimeScreen>;
 	};
 };
 
@@ -113,6 +127,14 @@ export const parseEmployees = (
 			? [{ id: employeeId, name: tile.name }]
 			: [];
 	});
+
+export const parseSlots = (
+	date: string,
+	day: TimeScreen["day"],
+): FreshaModel["slot"][] =>
+	day.__typename === "BookingFlowScreenTimeDayAvailable"
+		? (day.timeslots ?? []).map((slot) => ({ date, time: slot.time }))
+		: [];
 
 export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 	const call = async <T>(
@@ -196,10 +218,7 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 			: parseServices(result.screenServices);
 	};
 
-	const listEmployees = async (
-		locationSlug: string,
-		variantId: string,
-	): Promise<FreshaModel["employee"][] | FreshaError> => {
+	const openCart = async (locationSlug: string, variantId: string) => {
 		const init = await initialize(locationSlug);
 		if (init instanceof FreshaError) return init;
 
@@ -226,12 +245,67 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 		const employees = await press(continueAction.id, init.cartId);
 		if (employees instanceof FreshaError) return employees;
 
-		const tiles = employees.screenEmployee.employees;
+		const screen = employees.screenEmployee;
+		if (!screen.employees)
+			return new FreshaError("employees screen not reached", "graphql");
 
-		return tiles
-			? parseEmployees({ employees: tiles })
-			: new FreshaError("employee screen not reached", "graphql");
+		return { cartId: init.cartId, screen: screen as EmployeeScreen };
 	};
 
-	return { listServices, listEmployees };
+	const listEmployees = async (
+		locationSlug: string,
+		variantId: string,
+	): Promise<FreshaModel["employee"][] | FreshaError> => {
+		const cart = await openCart(locationSlug, variantId);
+		return cart instanceof FreshaError ? cart : parseEmployees(cart.screen);
+	};
+
+	const listSlots = async (
+		locationSlug: string,
+		variantId: string,
+		employeeId: number,
+		daysAhead: number,
+	): Promise<FreshaModel["slot"][] | FreshaError> => {
+		const cart = await openCart(locationSlug, variantId);
+		if (cart instanceof FreshaError) return cart;
+
+		const employeeAction = cart.screen.employees.find(
+			(tile) =>
+				tile.action && parseActionId(tile.action.id).employeeId === employeeId,
+		)?.action;
+		if (!employeeAction)
+			return new FreshaError(`employee ${employeeId} not found`, "graphql");
+
+		const selected = await press(employeeAction.id, cart.cartId);
+		if (selected instanceof FreshaError) return selected;
+
+		const continueAction = selected.screenEmployee.continueAction;
+		if (!continueAction)
+			return new FreshaError(
+				"employee screen has no continue action",
+				"graphql",
+			);
+
+		const time = await press(continueAction.id, cart.cartId);
+		if (time instanceof FreshaError) return time;
+
+		const dates = time.screenTime.dates;
+		if (!dates) return new FreshaError("time screen has no reached", "graphql");
+
+		const slots: FreshaModel["slot"][] = [];
+		for (const entry of dates.slice(0, daysAhead)) {
+			if (!entry.isAvailableToBeBooked || !entry.action) continue;
+			const date = entry.date.iso.slice(0, 10);
+
+			const opened = await press(entry.action.id, cart.cartId);
+			if (opened instanceof FreshaError) return opened;
+
+			const day = opened.screenTime.day;
+			if (!day) return new FreshaError(`day ${date} not reached`, "graphql");
+			slots.push(...parseSlots(date, day));
+		}
+		return slots;
+	};
+
+	return { listServices, listEmployees, listSlots };
 };

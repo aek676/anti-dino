@@ -1,4 +1,5 @@
 import { Elysia, status, t } from "elysia";
+import { env } from "@/utils/env";
 import { FreshaError, FreshaModel } from "./model";
 import { createFreshaService } from "./service";
 
@@ -36,6 +37,31 @@ export const fresha = new Elysia({ name: "fresha", prefix: "/fresha" })
 			}),
 			response: {
 				200: t.Array(FreshaModel.employee),
+				502: FreshaModel.error,
+			},
+		},
+	)
+	.get(
+		"/slots",
+		async ({ query }) => {
+			const result = await service.listSlots(
+				query.slug,
+				query.variantId,
+				query.employeeId,
+				env.DAYS_AHEAD,
+			);
+			return result instanceof FreshaError
+				? status(502, { message: result.message, kind: result.kind })
+				: result;
+		},
+		{
+			query: t.Object({
+				slug: t.String({ minLength: 1 }),
+				variantId: t.String({ minLength: 1 }),
+				employeeId: t.Integer({ minimum: 1 }),
+			}),
+			response: {
+				200: t.Array(FreshaModel.slot),
 				502: FreshaModel.error,
 			},
 		},

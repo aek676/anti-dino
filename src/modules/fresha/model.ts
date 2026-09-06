@@ -22,6 +22,10 @@ export const FreshaModel = {
 		id: t.Number(),
 		name: t.String(),
 	}),
+	slot: t.Object({
+		date: t.String({ format: "date" }),
+		time: t.String({ pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }),
+	}),
 	error: t.Object({
 		message: t.String(),
 		kind: t.Union([
