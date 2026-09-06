@@ -3,14 +3,23 @@
 ## Requirements
 
 - Bun 1.4 — `mise install` picks it up from `mise.toml`
+- [Varlock](https://varlock.dev) comes with `bun install`; run it as `bunx varlock ...`
 
 ## Getting started
 
+Env vars are declared in `.env.schema`. Put your values in a gitignored
+`.env.local` (every item without a default in the schema is required), then:
+
 ```bash
-cp .env.example .env.local   # then fill in the values
 bun install
+bunx varlock load   # validates .env.local against the schema, masks secrets
 bun run dev
 ```
+
+Varlock is wired as a Bun preload (`bunfig.toml`), so `bun run`, `bun test`
+and `bun --watch` load and validate the env automatically. Tests use the
+committed `.env.test`. Use `bunx varlock run -- <cmd>` when you also want
+secrets redacted from piped output.
 
 ## Scripts
 
@@ -23,11 +32,12 @@ bun run dev
 ## Docker
 
 The image compiles the app to a single binary and runs it on a distroless base
-(no shell, no Bun runtime). Secrets come from `.env.local`; the SQLite database
-lives in the `anti-dino-data` volume.
+(no shell, no Bun runtime). Env is resolved on the host by Varlock and passed
+to the container via `compose.yaml`; the SQLite database lives in the
+`anti-dino-data` volume.
 
 ```bash
-docker compose up --build -d
+NODE_ENV=production bunx varlock run -- docker compose up --build -d
 docker compose logs -f
 docker compose stop
 ```
