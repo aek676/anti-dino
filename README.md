@@ -47,10 +47,15 @@ secrets redacted from piped output.
 ## Docker
 
 The image compiles the app to a single binary and runs it on a distroless base
-(no shell, no Bun runtime). Env is resolved on the host by Varlock and passed
-to the container via `compose.yaml`. The binary embeds Varlock and validates that
-env against `.env.schema` on boot, refusing to start on a bad config. The SQLite
-database lives in the `anti-dino-data` volume.
+(no shell, no Bun runtime). Non-secret env is resolved on the host by Varlock and
+passed to the container via `compose.yaml`, together with `BITWARDEN_ACCESS_TOKEN`.
+The binary embeds Varlock and the vendored Bitwarden plugin (`varlock flatten
+--vendor-plugins` at build time), fetches the secrets from Bitwarden on boot and
+validates everything against `.env.schema`, refusing to start on a bad config.
+The SQLite database lives in the `anti-dino-data` volume.
+
+On a server without the repo, the same image only needs `BITWARDEN_ACCESS_TOKEN`
+plus the non-secret values in its environment.
 
 ```bash
 bunx varlock run -- docker compose up --build -d
