@@ -7,14 +7,29 @@
 
 ## Getting started
 
-Env vars are declared in `.env.schema`. Put your values in a gitignored
-`.env.local` (every item without a default in the schema is required), then:
+Env vars are declared in `.env.schema`. Secrets live in
+[Bitwarden Secrets Manager](https://bitwarden.com/products/secrets-manager/) and
+are referenced from the schema by id, so the only secret you hold locally is a
+machine account access token. Shared development defaults are committed in
+`.env.development`; create a gitignored `.env.local` with the values that are
+yours alone:
+
+```bash
+cat > .env.local <<'EOT'
+BITWARDEN_ACCESS_TOKEN=<machine account token>
+PUBLIC_URL=<public URL of your tunnel>
+ADMIN_CHAT_ID=<your Telegram chat id>
+EOT
+```
 
 ```bash
 bun install
 bunx varlock load   # validates .env.local against the schema, masks secrets
 bun run dev
 ```
+
+Tests never touch Bitwarden: `.env.test` overrides the secrets with placeholders
+and the access token is optional there.
 
 Varlock is wired as a Bun preload (`bunfig.toml`), so `bun run`, `bun test`
 and `bun --watch` load and validate the env automatically. Tests use the
