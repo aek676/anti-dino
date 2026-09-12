@@ -47,21 +47,24 @@ secrets redacted from piped output.
 ## Docker
 
 The image compiles the app to a single binary and runs it on a distroless base
-(no shell, no Bun runtime). Non-secret env is resolved on the host by Varlock and
-passed to the container via `compose.yaml`, together with `BITWARDEN_ACCESS_TOKEN`.
-The binary embeds Varlock and the vendored Bitwarden plugin (`varlock flatten
---vendor-plugins` at build time), fetches the secrets from Bitwarden on boot and
-validates everything against `.env.schema`, refusing to start on a bad config.
-The SQLite database lives in the `anti-dino-data` volume.
-
-On a server without the repo, the same image only needs `BITWARDEN_ACCESS_TOKEN`
-plus the non-secret values in its environment.
+(no shell, no Bun runtime, no Varlock CLI). Varlock runs on the host instead: it
+resolves and validates the whole config once, fetching the Bitwarden secrets with
+`BITWARDEN_ACCESS_TOKEN`, and hands the container the result in `__VARLOCK_ENV`.
+The binary only loads that blob, so the Bitwarden token never reaches the
+runtime. The SQLite database lives in the `anti-dino-data` volume.
 
 ```bash
-bunx varlock run -- docker compose up --build -d
+export __VARLOCK_ENV="$(NODE_ENV=production bunx varlock load --format json-full --compact)"
+docker compose up --build -d
 docker compose logs -f
 docker compose stop
 ```
+
+The first command fails if anything is missing or invalid, so a bad config never
+reaches the container. Re-run it after changing `.env.schema` or any `.env`
+value: the running container keeps the blob it started with. If the plaintext
+blob should not sit in the environment, Varlock also accepts an encrypted blob
+(`varlock:v1:...`) plus `_VARLOCK_ENV_KEY`.
 
 The build cross-compiles for the target architecture, so a multi-arch image
 (x86_64 and ARM64) can be produced from any host without emulation:
