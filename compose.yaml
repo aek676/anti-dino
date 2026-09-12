@@ -4,23 +4,8 @@ services:
     image: anti-dino:latest
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      PORT: "3000"
-      DATABASE_PATH: /app/data/anti-dino.sqlite
-      LOG_LEVEL: ${LOG_LEVEL}
-      WEBHOOK_PATH: ${WEBHOOK_PATH}
-      PUBLIC_URL: ${PUBLIC_URL}
-      BITWARDEN_ACCESS_TOKEN: ${BITWARDEN_ACCESS_TOKEN}
-      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID}
-      FRESHA_LOCATION_ID: ${FRESHA_LOCATION_ID}
-      FRESHA_EMPLOYEE_ID: ${FRESHA_EMPLOYEE_ID}
-      FRESHA_SERVICE_ID: ${FRESHA_SERVICE_ID}
-      FRESHA_BOOKING_URL: ${FRESHA_BOOKING_URL}
-      CHECK_INTERVAL_MINUTES: ${CHECK_INTERVAL_MINUTES}
-      DAYS_AHEAD: ${DAYS_AHEAD}
-      MAX_DAYS_PER_CHECK: ${MAX_DAYS_PER_CHECK}
-      FRESHA_STEP_DELAY_MS: ${FRESHA_STEP_DELAY_MS}
-      FAILURE_ALERT_THRESHOLD: ${FAILURE_ALERT_THRESHOLD}
+      # Pre-resolved env blob. See the Docker section of the README.
+      __VARLOCK_ENV: ${__VARLOCK_ENV:?see the Docker section of the README}
     ports:
       - "3000:3000"
     volumes:
