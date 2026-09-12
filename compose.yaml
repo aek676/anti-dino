@@ -4,7 +4,6 @@ services:
     image: anti-dino:latest
     restart: unless-stopped
     environment:
-      # Pre-resolved env blob. See the Docker section of the README.
       __VARLOCK_ENV: ${__VARLOCK_ENV:?see the Docker section of the README}
     ports:
       - "3000:3000"
