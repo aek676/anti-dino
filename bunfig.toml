@@ -3,3 +3,6 @@ preload = ["varlock/auto-load"]
 
 [test]
 preload = ["varlock/auto-load"]
+coverage = true
+coverageReporter = ["text", "lcov"]
+coverageDir = "coverage"

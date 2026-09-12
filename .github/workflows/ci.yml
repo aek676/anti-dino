@@ -63,6 +63,38 @@ jobs:
       - name: Test
         run: bun test
 
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    name: Coverage report
+    needs: check
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download coverage
+        uses: actions/download-artifact@v6
+        with:
+          name: lcov
+          path: coverage
+
+      - name: Run octocov
+        uses: k1LoW/octocov-action@v1
+
   reviewdog:
     name: Biome (reviewdog)
     if: github.event_name == 'pull_request'
@@ -101,7 +133,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, reviewdog]
+    needs: [check, coverage, reviewdog]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any required job failed
