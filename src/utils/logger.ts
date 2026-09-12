@@ -1,8 +1,8 @@
 import { createPinoLogger } from "@bogeychan/elysia-logger";
-import { env } from "@/utils/env";
+import { ENV } from "varlock/env";
 
 export const log = createPinoLogger({
-	level: env.LOG_LEVEL,
+	level: ENV.LOG_LEVEL,
 	redact: [
 		"req.headers.authorization",
 		'req.headers["x-telegram-bot-api-secret-token"]',

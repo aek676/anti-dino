@@ -1,9 +1,9 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { ENV } from "varlock/env";
 import { migrate, schemaVersion } from "@/utils/db/migrate";
 import type { Db } from "@/utils/db/types";
-import { env } from "@/utils/env";
 import { log } from "@/utils/logger";
 
 export type { Db } from "@/utils/db/types";
@@ -28,4 +28,4 @@ export const closeDatabase = (db: Db): void => {
 	log.info("database closed");
 };
 
-export const db: Db = openDatabase(env.DATABASE_PATH);
+export const db: Db = openDatabase(ENV.DATABASE_PATH);

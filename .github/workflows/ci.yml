@@ -45,9 +45,17 @@ jobs:
           path: ${{ steps.bun-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
 
+      - name: Scan for leaked secrets
+        run: bunx varlock scan
+
       - name: Run Biome
         if: github.event_name == 'push'
         run: bunx biome ci
+
+      - name: Load environment variables
+        uses: dmno-dev/varlock-action@v1.0.5
+        env:
+          NODE_ENV: test
 
       - name: Typecheck
         run: bun run typecheck

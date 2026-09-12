@@ -10,7 +10,7 @@ RUN bun ci
 FROM --platform=$BUILDPLATFORM base AS builder
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json tsconfig.json ./
+COPY package.json tsconfig.json .env.schema ./
 COPY src ./src
 
 ENV NODE_ENV=production
@@ -24,13 +24,15 @@ RUN case "$TARGETARCH" in \
     && bun run "build:linux-$arch" \
     && mv "dist/server-linux-$arch" dist/server
 
-RUN mkdir -p /app/data
+RUN bunx varlock flatten --vendor-plugins \
+    && mkdir -p /app/data
 
 FROM gcr.io/distroless/base-debian13:nonroot AS runner
 
 WORKDIR /app
 
 COPY --from=builder /app/dist/server ./server
+COPY --from=builder /app/.env-flat/ ./
 COPY --from=builder --chown=65532:65532 /app/data ./data
 
 ENV NODE_ENV=production \

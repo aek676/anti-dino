@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run --watch src/index.ts | pino-pretty",
+    "dev": "bun run --watch src/modules/app/index.ts | pino-pretty",
     "start": "bun run src/index.ts",
     "build": "bun build --compile --minify --target bun --outfile dist/server src/index.ts",
     "build:linux-x64": "bun build --compile --minify --target bun-linux-x64 --outfile dist/server-linux-x64 src/index.ts",
@@ -18,9 +18,10 @@
   "dependencies": {
     "@bogeychan/elysia-logger": "^0.1.10",
     "@elysiajs/cron": "^1.4.2",
-    "@sinclair/typebox": "^0.34.52",
+    "@varlock/bitwarden-plugin": "^2.0.1",
     "elysia": "^1.4.30",
-    "grammy": "^1.46.0"
+    "grammy": "^1.46.0",
+    "varlock": "^1.18.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
