@@ -45,6 +45,7 @@ encajaba con el estado del carrito (por ejemplo, un modal abierto).
 ## Datos de LaClínica
 
 - `locationSlug`: `laclinica-la-gangosa-bulevar-ciudad-de-vicar-gg4e0gad`, `locationId` 1394665, provider 1324442.
+  `Initialize` acepta en `locationSlug` tanto el slug como el `locationId` numérico (comprobado sep 2026).
 - Servicio "Corte de pelo": catalog `s:16131271`, variante `sv:18605549`, 30 min.
 - Empleados: Sergio `5236325`, Elvis `3182031`.
 - `dates[]` trae 31 días con `isAvailableToBeBooked`; solo hay que abrir los días marcados.
