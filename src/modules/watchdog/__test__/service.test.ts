@@ -1,0 +1,195 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { ENV } from "varlock/env";
+import { FreshaError, type FreshaModel } from "@/modules/fresha/model";
+import { createWatchdogService, retry } from "@/modules/watchdog/service";
+import { type Db, openDatabase } from "@/utils/db";
+
+type Slot = FreshaModel["slot"];
+
+const employeeId = String(ENV.FRESHA_EMPLOYEE_ID);
+const serviceId = ENV.FRESHA_SERVICE_ID;
+
+const slotA: Slot = { date: "2026-09-17", time: "11:30" };
+const slotB: Slot = { date: "2026-09-17", time: "11:45" };
+const slotC: Slot = { date: "2026-09-18", time: "10:00" };
+
+const fake = (slots: Slot[]) => {
+	let calls = 0;
+	return {
+		listSlots: () => {
+			calls++;
+			return Promise.resolve(slots);
+		},
+		get calls() {
+			return calls;
+		},
+	};
+};
+
+const failing = (message = "boom") => {
+	let calls = 0;
+	return {
+		listSlots: () => {
+			calls++;
+			return Promise.resolve(new FreshaError(message, "http"));
+		},
+		get calls() {
+			return calls;
+		},
+	};
+};
+
+describe("retry", () => {
+	let waits: number[];
+	const sleep = (ms: number) => {
+		waits.push(ms);
+		return Promise.resolve();
+	};
+
+	beforeEach(() => {
+		waits = [];
+	});
+
+	test("returns the first success and backs off between attempts", async () => {
+		let calls = 0;
+		const fn = () => {
+			calls++;
+			return Promise.resolve(
+				calls < 3 ? new FreshaError(`fail ${calls}`, "http") : "ok",
+			);
+		};
+
+		const result = await retry(fn, 5, sleep);
+
+		expect(result).toBe("ok");
+		expect(calls).toBe(3);
+		expect(waits).toEqual([2000, 4000]);
+	});
+
+	test("returns the last error and does not sleep after the last attempt", async () => {
+		let calls = 0;
+		const fn = () => {
+			calls++;
+			return Promise.resolve(new FreshaError(`fail ${calls}`, "http"));
+		};
+
+		const result = await retry(fn, 3, sleep);
+
+		expect(result).toBeInstanceOf(FreshaError);
+		expect((result as FreshaError).message).toBe("fail 3");
+		expect(calls).toBe(3);
+		expect(waits).toHaveLength(2);
+	});
+});
+
+describe("check", () => {
+	let db: Db;
+	let sent: string[];
+	const notify = (text: string) => {
+		sent.push(text);
+		return Promise.resolve();
+	};
+	const sleep = () => Promise.resolve();
+	const now = () => new Date("2026-09-14T10:00:00Z");
+
+	const service = (fresha: {
+		listSlots: () => Promise<Slot[] | FreshaError>;
+	}) => createWatchdogService({ db, fresha, notify, now, sleep });
+
+	const countSlots = () =>
+		db
+			.query<{ n: number }, [string, string]>(
+				"SELECT COUNT(*) AS n FROM slots WHERE employee_id = ? AND service_id = ?",
+			)
+			.get(employeeId, serviceId)?.n ?? 0;
+
+	beforeEach(() => {
+		db = openDatabase(":memory:");
+		sent = [];
+	});
+	afterEach(() => {
+		db.close();
+	});
+
+	test("first run persists and notifies every slot", async () => {
+		const result = await service(fake([slotA, slotB])).check();
+
+		expect(result).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30", "2026-09-17T11:45"],
+		});
+		expect(sent).toHaveLength(1);
+		expect(sent[0]).toContain("2026-09-17T11:30");
+		expect(sent[0]).toContain("2026-09-17T11:45");
+		expect(sent[0]).toContain(ENV.FRESHA_BOOKING_URL);
+		expect(countSlots()).toBe(2);
+
+		const row = db
+			.query<{ seen_at: string }, []>("SELECT seen_at FROM slots LIMIT 1")
+			.get();
+		expect(row?.seen_at).toBe("2026-09-14T10:00:00.000Z");
+	});
+
+	test("second run with the same slots is silent", async () => {
+		const watchdog = service(fake([slotA, slotB]));
+		await watchdog.check();
+
+		const result = await watchdog.check();
+
+		expect(result).toEqual({ ok: true, newSlots: [] });
+		expect(sent).toHaveLength(1);
+		expect(countSlots()).toBe(2);
+	});
+
+	test("only reports slots not seen before", async () => {
+		await service(fake([slotA, slotB])).check();
+
+		const result = await service(fake([slotA, slotB, slotC])).check();
+
+		expect(result).toEqual({ ok: true, newSlots: ["2026-09-18T10:00"] });
+		expect(sent).toHaveLength(2);
+		expect(sent[1]).toContain("2026-09-18T10:00");
+		expect(sent[1]).not.toContain("2026-09-17T11:30");
+		expect(countSlots()).toBe(3);
+	});
+
+	test("collapses duplicated slots", async () => {
+		const result = await service(fake([slotA, slotA])).check();
+
+		expect(result).toEqual({ ok: true, newSlots: ["2026-09-17T11:30"] });
+		expect(countSlots()).toBe(1);
+	});
+
+	test("alerts once after exhausting retries when Fresha fails", async () => {
+		const fresha = failing("HTTP 503");
+
+		const result = await service(fresha).check();
+
+		expect(result).toEqual({ ok: false });
+		expect(fresha.calls).toBe(ENV.FAILURE_ALERT_THRESHOLD);
+		expect(sent).toHaveLength(1);
+		expect(sent[0]).toStartWith("Fresha API error");
+		expect(sent[0]).toContain("HTTP 503");
+		expect(countSlots()).toBe(0);
+	});
+
+	test("does not persist when notify fails, so the next run alerts again", async () => {
+		const fresha = fake([slotA]);
+		const broken = createWatchdogService({
+			db,
+			fresha,
+			now,
+			sleep,
+			notify: () => Promise.reject(new Error("telegram down")),
+		});
+
+		expect(broken.check()).rejects.toThrow("telegram down");
+		expect(countSlots()).toBe(0);
+
+		const result = await service(fresha).check();
+
+		expect(result).toEqual({ ok: true, newSlots: ["2026-09-17T11:30"] });
+		expect(sent).toHaveLength(1);
+		expect(countSlots()).toBe(1);
+	});
+});
