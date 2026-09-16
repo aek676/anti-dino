@@ -82,6 +82,27 @@ const insertNewSlots = (
 };
 
 export const createWatchdogService = (deps: WatchdogDeps) => {
+	let failures = 0;
+
+	const fail = async (error: FreshaError) => {
+		failures++;
+		log.warn({ failures, err: error.message }, "watchdog check failed");
+
+		if (failures === ENV.FAILURE_ALERT_THRESHOLD) {
+			await deps.notify(
+				`Fresha API error (${failures} checks in a row): ${error.message}`,
+			);
+		}
+		return { ok: false as const };
+	};
+
+	const recover = async () => {
+		if (failures >= ENV.FAILURE_ALERT_THRESHOLD) {
+			await deps.notify(`Fresha OK again after ${failures} failed checks`);
+		}
+		failures = 0;
+	};
+
 	const check = async () => {
 		const employeeId = String(ENV.FRESHA_EMPLOYEE_ID);
 		const slots = await retry(
@@ -96,10 +117,8 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			deps.sleep,
 		);
 
-		if (slots instanceof FreshaError) {
-			await deps.notify(`Fresha API error: ${slots.message}`);
-			return { ok: false };
-		}
+		if (slots instanceof FreshaError) return fail(slots);
+		await recover();
 
 		const startTimes = slots.map((slot) => `${slot.date}T${slot.time}`);
 		const known = new Set(

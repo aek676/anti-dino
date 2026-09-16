@@ -28,10 +28,14 @@ const fake = (slots: Slot[]) => {
 
 const failing = (message = "boom") => {
 	let calls = 0;
+	let slots: Slot[] | undefined;
 	return {
-		listSlots: () => {
+		listSlots: (): Promise<Slot[] | FreshaError> => {
 			calls++;
-			return Promise.resolve(new FreshaError(message, "http"));
+			return Promise.resolve(slots ?? new FreshaError(message, "http"));
+		},
+		recover: (next: Slot[]) => {
+			slots = next;
 		},
 		get calls() {
 			return calls;
@@ -160,17 +164,55 @@ describe("check", () => {
 		expect(countSlots()).toBe(1);
 	});
 
-	test("alerts once after exhausting retries when Fresha fails", async () => {
+	const threshold = ENV.FAILURE_ALERT_THRESHOLD;
+
+	test("retries a transient failure a few times and stays silent", async () => {
 		const fresha = failing("HTTP 503");
 
 		const result = await service(fresha).check();
 
 		expect(result).toEqual({ ok: false });
 		expect(fresha.calls).toBe(3);
-		expect(sent).toHaveLength(1);
-		expect(sent[0]).toStartWith("Fresha API error");
-		expect(sent[0]).toContain("HTTP 503");
+		expect(sent).toEqual([]);
 		expect(countSlots()).toBe(0);
+	});
+
+	test("alerts once when failures reach the threshold, then on recovery", async () => {
+		const fresha = failing("HTTP 503");
+		const watchdog = service(fresha);
+
+		for (let i = 1; i < threshold; i++) await watchdog.check();
+		expect(sent).toEqual([]);
+
+		await watchdog.check();
+		expect(sent).toHaveLength(1);
+		expect(sent[0]).toBe(
+			`Fresha API error (${threshold} checks in a row): HTTP 503`,
+		);
+
+		await watchdog.check();
+		expect(sent).toHaveLength(1);
+
+		fresha.recover([slotA]);
+		const result = await watchdog.check();
+
+		expect(result).toEqual({ ok: true, newSlots: ["2026-09-17T11:30"] });
+		expect(sent).toHaveLength(3);
+		expect(sent[1]).toBe(
+			`Fresha OK again after ${threshold + 1} failed checks`,
+		);
+		expect(sent[2]).toContain("2026-09-17T11:30");
+	});
+
+	test("a short failure streak recovers without any message", async () => {
+		const fresha = failing("HTTP 503");
+		const watchdog = service(fresha);
+
+		await watchdog.check();
+		fresha.recover([]);
+		await watchdog.check();
+
+		expect(sent).toEqual([]);
 	});
 
 	test("does not persist when notify fails, so the next run alerts again", async () => {
