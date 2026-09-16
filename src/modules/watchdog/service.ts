@@ -87,8 +87,34 @@ const insertNewSlots = (
 	insertAll(startTimes);
 };
 
+const deleteGoneSlots = (
+	db: Db,
+	employeeId: string,
+	serviceId: string,
+	startTimes: string[],
+) => {
+	const query = db.query<
+		void,
+		{
+			employeeId: string;
+			serviceId: string;
+			startsAt: string;
+		}
+	>(
+		`DELETE FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId AND starts_at = :startsAt`,
+	);
+
+	const deleteAll = db.transaction((values: string[]) => {
+		for (const startsAt of values) {
+			query.run({ employeeId, serviceId, startsAt });
+		}
+	});
+
+	deleteAll(startTimes);
+};
+
 export type CheckResult =
-	| { ok: true; newSlots: string[] }
+	| { ok: true; newSlots: string[]; goneSlots: string[] }
 	| { ok: false; skipped?: true };
 
 export const createWatchdogService = (deps: WatchdogDeps) => {
@@ -143,14 +169,19 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		if (slots instanceof FreshaError) return fail(slots);
 		await recover();
 
-		const startTimes = slots.map((slot) => `${slot.date}T${slot.time}`);
+		const startTimes = new Set(
+			slots.map((slot) => `${slot.date}T${slot.time}`),
+		);
+
 		const known = new Set(
 			listKnownStartTimes(deps.db, employeeId, ENV.FRESHA_SERVICE_ID),
 		);
 
-		const newStartTimes = [...new Set(startTimes)].filter(
-			(slot) => !known.has(slot),
-		);
+		const newStartTimes = [...startTimes].filter((slot) => !known.has(slot));
+
+		const goneStartTimes = [...known].filter((slot) => !startTimes.has(slot));
+
+		deleteGoneSlots(deps.db, employeeId, ENV.FRESHA_SERVICE_ID, goneStartTimes);
 
 		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
 
@@ -172,7 +203,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			seenAt,
 		);
 
-		return { ok: true, newSlots: newStartTimes };
+		return { ok: true, newSlots: newStartTimes, goneSlots: goneStartTimes };
 	};
 
 	return { check };
