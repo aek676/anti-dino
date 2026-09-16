@@ -195,6 +195,24 @@ describe("listEmployees", () => {
 			message: expect.stringContaining("boom"),
 		});
 	});
+
+	test("fails when the services screen has no continue action", async () => {
+		const stuck = structuredClone(addService);
+		Object.assign(stuck.data.bookingFlowActionButtonPressed.screenServices, {
+			continueAction: null,
+		});
+		const { fetchFn } = sequence([initialize, stuck]);
+
+		const result = await createFreshaService(fetchFn).listEmployees(
+			slug,
+			"sv:18605549",
+		);
+
+		expect(result).toMatchObject({
+			kind: "graphql",
+			message: "services screen has no continue action",
+		});
+	});
 });
 
 describe("parseSlots", () => {
@@ -219,7 +237,7 @@ describe("parseSlots", () => {
 });
 
 describe("listSlots", () => {
-	const router = () => {
+	const router = (overrides: Record<string, unknown> = {}) => {
 		const pressed: Record<string, unknown>[] = [];
 		const fetchFn: FetchFn = (_, init) => {
 			const body = JSON.parse(init.body as string);
@@ -234,6 +252,7 @@ describe("listSlots", () => {
 				onScreenEmployeeSet: employees,
 				onScreenEmployeeContinue: time,
 				onScreenTimeDaySelectorDateSet: day,
+				...overrides,
 			};
 			return Promise.resolve(Response.json(responses[action.type]));
 		};
@@ -262,6 +281,79 @@ describe("listSlots", () => {
 
 		expect(result).toHaveLength(24 * 14);
 		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
+	});
+
+	test("reads the preselected day from the time screen instead of pressing it", async () => {
+		const preselected = structuredClone(time);
+		const screenTime =
+			preselected.data.bookingFlowActionButtonPressed.screenTime;
+		const dates = screenTime.dates.map((entry, index) => ({
+			...entry,
+			isSelected: index === 3,
+			action: index === 3 ? null : entry.action,
+		}));
+		Object.assign(screenTime, {
+			dates,
+			day: day.data.bookingFlowActionButtonPressed.screenTime.day,
+		});
+		const { fetchFn, pressed } = router({
+			onScreenEmployeeContinue: preselected,
+		});
+
+		const result = await createFreshaService(fetchFn).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			5,
+		);
+
+		expect(
+			pressed.filter((a) => a.type === "onScreenTimeDaySelectorDateSet"),
+		).toEqual([expect.objectContaining({ date: "2026-09-09" })]);
+		expect(result).toHaveLength(2 * 14);
+		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
+	});
+
+	test("fails when the employee screen has no continue action", async () => {
+		const stuck = structuredClone(employees);
+		Object.assign(stuck.data.bookingFlowActionButtonPressed.screenEmployee, {
+			continueAction: null,
+		});
+		const { fetchFn, pressed } = router({ onScreenEmployeeSet: stuck });
+
+		const result = await createFreshaService(fetchFn).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			31,
+		);
+
+		expect(result).toMatchObject({
+			kind: "graphql",
+			message: "employee screen has no continue action",
+		});
+		expect(pressed.map((a) => a.type)).toEqual([
+			"onScreenServicesServiceVariantAdd",
+			"onScreenServicesContinue",
+			"onScreenEmployeeSet",
+		]);
+	});
+
+	test("waits stepDelayMs between the days it opens, not before the first", async () => {
+		const { fetchFn } = router();
+		const waits: number[] = [];
+		const sleep = (ms: number) => {
+			waits.push(ms);
+			return Promise.resolve();
+		};
+
+		const result = await createFreshaService(fetchFn, {
+			stepDelayMs: 1500,
+			sleep,
+		}).listSlots(slug, "sv:18605549", 3182031, 5);
+
+		expect(result).toHaveLength(2 * 14);
+		expect(waits).toEqual([1500]);
 	});
 
 	test("looks only daysAhead days into the future", async () => {

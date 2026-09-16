@@ -4,6 +4,7 @@ export class FreshaError extends Error {
 	constructor(
 		message: string,
 		readonly kind: "http" | "graphql" | "unknown-operation",
+		readonly status?: number,
 	) {
 		super(message);
 		this.name = "FreshaError";
