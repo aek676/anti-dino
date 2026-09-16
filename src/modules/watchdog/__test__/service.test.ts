@@ -135,6 +135,7 @@ describe("check", () => {
 		expect(result).toEqual({
 			ok: true,
 			newSlots: ["2026-09-17T11:30", "2026-09-17T11:45"],
+			goneSlots: [],
 		});
 		expect(sent).toHaveLength(1);
 		expect(sent[0]).toContain("2026-09-17T11:30");
@@ -154,7 +155,7 @@ describe("check", () => {
 
 		const result = await watchdog.check();
 
-		expect(result).toEqual({ ok: true, newSlots: [] });
+		expect(result).toEqual({ ok: true, newSlots: [], goneSlots: [] });
 		expect(sent).toHaveLength(1);
 		expect(countSlots()).toBe(2);
 	});
@@ -164,7 +165,11 @@ describe("check", () => {
 
 		const result = await service(fake([slotA, slotB, slotC])).check();
 
-		expect(result).toEqual({ ok: true, newSlots: ["2026-09-18T10:00"] });
+		expect(result).toEqual({
+			ok: true,
+			newSlots: ["2026-09-18T10:00"],
+			goneSlots: [],
+		});
 		expect(sent).toHaveLength(2);
 		expect(sent[1]).toContain("2026-09-18T10:00");
 		expect(sent[1]).not.toContain("2026-09-17T11:30");
@@ -174,7 +179,11 @@ describe("check", () => {
 	test("collapses duplicated slots", async () => {
 		const result = await service(fake([slotA, slotA])).check();
 
-		expect(result).toEqual({ ok: true, newSlots: ["2026-09-17T11:30"] });
+		expect(result).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30"],
+			goneSlots: [],
+		});
 		expect(countSlots()).toBe(1);
 	});
 
@@ -210,7 +219,11 @@ describe("check", () => {
 		fresha.recover([slotA]);
 		const result = await watchdog.check();
 
-		expect(result).toEqual({ ok: true, newSlots: ["2026-09-17T11:30"] });
+		expect(result).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30"],
+			goneSlots: [],
+		});
 		expect(sent).toHaveLength(3);
 		expect(sent[1]).toBe(
 			`Fresha OK again after ${threshold + 1} failed checks`,
@@ -251,6 +264,7 @@ describe("check", () => {
 		expect(await watchdog.check()).toEqual({
 			ok: true,
 			newSlots: ["2026-09-17T11:30"],
+			goneSlots: [],
 		});
 		expect(sent).toHaveLength(1);
 	});
@@ -290,8 +304,64 @@ describe("check", () => {
 
 		const result = await service(fresha).check();
 
-		expect(result).toEqual({ ok: true, newSlots: ["2026-09-17T11:30"] });
+		expect(result).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30"],
+			goneSlots: [],
+		});
 		expect(sent).toHaveLength(1);
 		expect(countSlots()).toBe(1);
+	});
+
+	test("forgets a slot that disappears", async () => {
+		await service(fake([slotA, slotB])).check();
+
+		const result = await service(fake([slotA])).check();
+
+		expect(result).toEqual({
+			ok: true,
+			newSlots: [],
+			goneSlots: ["2026-09-17T11:45"],
+		});
+		expect(sent).toHaveLength(1);
+		expect(countSlots()).toBe(1);
+	});
+
+	test("reports a slot again when it comes back", async () => {
+		await service(fake([slotA, slotB])).check();
+		await service(fake([slotA])).check();
+
+		const result = await service(fake([slotA, slotB])).check();
+
+		expect(result).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:45"],
+			goneSlots: [],
+		});
+		expect(sent).toHaveLength(2);
+		expect(countSlots()).toBe(2);
+	});
+
+	test("keeps the table untouched when Fresha fails", async () => {
+		await service(fake([slotA])).check();
+
+		const result = await service(failing()).check();
+
+		expect(result).toEqual({ ok: false });
+		expect(countSlots()).toBe(1);
+	});
+
+	test("empties the table when nothing is free", async () => {
+		await service(fake([slotA, slotB])).check();
+
+		const result = await service(fake([])).check();
+
+		expect(result).toEqual({
+			ok: true,
+			newSlots: [],
+			goneSlots: ["2026-09-17T11:30", "2026-09-17T11:45"],
+		});
+		expect(sent).toHaveLength(1);
+		expect(countSlots()).toBe(0);
 	});
 });

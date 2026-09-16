@@ -53,7 +53,7 @@ const listKnownStartTimes = (
 		{ starts_at: string },
 		{ employeeId: string; serviceId: string }
 	>(
-		"SELECT starts_at FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId",
+		"SELECT starts_at FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId ORDER BY starts_at",
 	);
 	return query.all({ employeeId, serviceId }).map((row) => row.starts_at);
 };
