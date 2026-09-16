@@ -3,13 +3,14 @@ import { FreshaError } from "@/modules/fresha/model";
 import type { createFreshaService } from "@/modules/fresha/service";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
+import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 
 export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (text: string) => Promise<void>;
 	now?: () => Date;
-	sleep?: (ms: number) => Promise<void>;
+	sleep?: Sleep;
 };
 
 const RETRY_ATTEMPTS = 3;
@@ -20,13 +21,10 @@ const TOO_MANY_REQUESTS = 429;
 export const isRateLimited = (error: FreshaError) =>
 	error.status === TOO_MANY_REQUESTS;
 
-const defaultSleep = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 export const retry = async <T>(
 	fn: () => Promise<T | FreshaError>,
 	attempts: number,
-	sleep: (ms: number) => Promise<void> = defaultSleep,
+	sleep: Sleep = defaultSleep,
 ): Promise<T | FreshaError> => {
 	let lastError = new FreshaError("no attempts", "unknown-operation");
 

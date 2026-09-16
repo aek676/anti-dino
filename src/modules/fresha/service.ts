@@ -1,4 +1,5 @@
 import { FreshaError, type FreshaModel } from "@/modules/fresha/model";
+import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 
 const ENDPOINT = "https://www.fresha.com/graphql";
 
@@ -142,12 +143,9 @@ export const parseSlots = (
 		? (day.timeslots ?? []).map((slot) => ({ date, time: slot.time }))
 		: [];
 
-const defaultSleep = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 export type FreshaOptions = {
 	stepDelayMs?: number;
-	sleep?: (ms: number) => Promise<void>;
+	sleep?: Sleep;
 };
 
 export const createFreshaService = (
