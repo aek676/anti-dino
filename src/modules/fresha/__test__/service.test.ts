@@ -219,7 +219,7 @@ describe("parseSlots", () => {
 });
 
 describe("listSlots", () => {
-	const router = () => {
+	const router = (timeScreen: unknown = time) => {
 		const pressed: Record<string, unknown>[] = [];
 		const fetchFn: FetchFn = (_, init) => {
 			const body = JSON.parse(init.body as string);
@@ -232,7 +232,7 @@ describe("listSlots", () => {
 				onScreenServicesServiceVariantAdd: addService,
 				onScreenServicesContinue: employees,
 				onScreenEmployeeSet: employees,
-				onScreenEmployeeContinue: time,
+				onScreenEmployeeContinue: timeScreen,
 				onScreenTimeDaySelectorDateSet: day,
 			};
 			return Promise.resolve(Response.json(responses[action.type]));
@@ -261,6 +261,35 @@ describe("listSlots", () => {
 		expect(pressed[4]).toMatchObject({ date: "2026-09-08" });
 
 		expect(result).toHaveLength(24 * 14);
+		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
+	});
+
+	test("reads the preselected day from the time screen instead of pressing it", async () => {
+		const preselected = structuredClone(time);
+		const screenTime =
+			preselected.data.bookingFlowActionButtonPressed.screenTime;
+		const dates = screenTime.dates.map((entry, index) => ({
+			...entry,
+			isSelected: index === 3,
+			action: index === 3 ? null : entry.action,
+		}));
+		Object.assign(screenTime, {
+			dates,
+			day: day.data.bookingFlowActionButtonPressed.screenTime.day,
+		});
+		const { fetchFn, pressed } = router(preselected);
+
+		const result = await createFreshaService(fetchFn).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			5,
+		);
+
+		expect(
+			pressed.filter((a) => a.type === "onScreenTimeDaySelectorDateSet"),
+		).toEqual([expect.objectContaining({ date: "2026-09-09" })]);
+		expect(result).toHaveLength(2 * 14);
 		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
 	});
 

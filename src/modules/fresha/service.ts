@@ -300,13 +300,20 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 
 		const slots: FreshaModel["slot"][] = [];
 		for (const entry of dates.slice(0, daysAhead)) {
-			if (!entry.isAvailableToBeBooked || !entry.action) continue;
+			if (!entry.isAvailableToBeBooked) continue;
 			const date = entry.date.iso.slice(0, 10);
 
-			const opened = await press(entry.action.id, cart.cartId);
-			if (opened instanceof FreshaError) return opened;
+			if (!entry.action) {
+				const day = time.screenTime.day;
+				if (!day) return new FreshaError(`day ${date} not reached`, "graphql");
+				slots.push(...parseSlots(date, day));
+				continue;
+			}
 
-			const day = opened.screenTime.day;
+			const pressed = await press(entry.action.id, cart.cartId);
+			if (pressed instanceof FreshaError) return pressed;
+
+			const day = pressed.screenTime.day;
 			if (!day) return new FreshaError(`day ${date} not reached`, "graphql");
 			slots.push(...parseSlots(date, day));
 		}
