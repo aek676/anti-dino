@@ -188,7 +188,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		if (newStartTimes.length > 0) {
 			await deps.notify(
 				[
-					`${newStartTimes.length} hueco(s) nuevo(s):`,
+					`${newStartTimes.length} new slot(s):`,
 					...newStartTimes,
 					ENV.FRESHA_BOOKING_URL,
 				].join("\n"),
