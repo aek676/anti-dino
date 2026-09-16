@@ -142,7 +142,18 @@ export const parseSlots = (
 		? (day.timeslots ?? []).map((slot) => ({ date, time: slot.time }))
 		: [];
 
-export const createFreshaService = (fetchFn: FetchFn = fetch) => {
+const defaultSleep = (ms: number) =>
+	new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export type FreshaOptions = {
+	stepDelayMs?: number;
+	sleep?: (ms: number) => Promise<void>;
+};
+
+export const createFreshaService = (
+	fetchFn: FetchFn = fetch,
+	{ stepDelayMs = 0, sleep = defaultSleep }: FreshaOptions = {},
+) => {
 	const call = async <T>(
 		operation: Operation,
 		variables: Record<string, unknown>,
@@ -299,6 +310,7 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 		if (!dates) return new FreshaError("time screen has no reached", "graphql");
 
 		const slots: FreshaModel["slot"][] = [];
+		let opened = 0;
 		for (const entry of dates.slice(0, daysAhead)) {
 			if (!entry.isAvailableToBeBooked) continue;
 			const date = entry.date.iso.slice(0, 10);
@@ -310,6 +322,7 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 				continue;
 			}
 
+			if (opened++ > 0 && stepDelayMs > 0) await sleep(stepDelayMs);
 			const pressed = await press(entry.action.id, cart.cartId);
 			if (pressed instanceof FreshaError) return pressed;
 

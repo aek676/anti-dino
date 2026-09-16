@@ -293,6 +293,23 @@ describe("listSlots", () => {
 		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
 	});
 
+	test("waits stepDelayMs between the days it opens, not before the first", async () => {
+		const { fetchFn } = router();
+		const waits: number[] = [];
+		const sleep = (ms: number) => {
+			waits.push(ms);
+			return Promise.resolve();
+		};
+
+		const result = await createFreshaService(fetchFn, {
+			stepDelayMs: 1500,
+			sleep,
+		}).listSlots(slug, "sv:18605549", 3182031, 5);
+
+		expect(result).toHaveLength(2 * 14);
+		expect(waits).toEqual([1500]);
+	});
+
 	test("looks only daysAhead days into the future", async () => {
 		const { fetchFn, pressed } = router();
 

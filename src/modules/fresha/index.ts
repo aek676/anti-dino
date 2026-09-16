@@ -3,8 +3,12 @@ import { ENV } from "varlock/env";
 import { FreshaError, FreshaModel } from "./model";
 import { createFreshaService } from "./service";
 
+export { createFreshaService } from "./service";
+
 export const fresha = () => {
-	const freshaService = createFreshaService();
+	const freshaService = createFreshaService(fetch, {
+		stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
+	});
 
 	return new Elysia({ name: "fresha", prefix: "/fresha" })
 		.get(
