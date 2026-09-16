@@ -17,7 +17,11 @@ export const watchdog = (deps: WatchdogDeps) => {
 					const result = await watchdogService.check();
 					log.info(
 						result.ok
-							? { ok: true, newSlots: result.newSlots.length }
+							? {
+									ok: true,
+									newSlots: result.newSlots.length,
+									goneSlots: result.goneSlots.length,
+								}
 							: { ok: false },
 						"watchdog check",
 					);
