@@ -167,7 +167,7 @@ export const createFreshaService = (fetchFn: FetchFn = fetch) => {
 		});
 
 		if (!res.ok) {
-			return new FreshaError(`${name}: HTTP ${res.status}`, "http");
+			return new FreshaError(`${name}: HTTP ${res.status}`, "http", res.status);
 		}
 
 		const body = (await res.json()) as GraphqlResponse<T>;
