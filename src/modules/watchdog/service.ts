@@ -14,6 +14,11 @@ export type WatchdogDeps = {
 
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2000;
+const MAX_SKIPPED_TICKS = 6;
+const TOO_MANY_REQUESTS = 429;
+
+export const isRateLimited = (error: FreshaError) =>
+	error.status === TOO_MANY_REQUESTS;
 
 const defaultSleep = (ms: number) =>
 	new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -32,6 +37,7 @@ export const retry = async <T>(
 		lastError = result;
 		log.warn({ attempt, attempts, err: result.message }, "fresha call failed");
 
+		if (isRateLimited(result)) return result;
 		if (attempt < attempts) await sleep(RETRY_DELAY_MS * attempt);
 	}
 
@@ -81,12 +87,23 @@ const insertNewSlots = (
 	insertAll(startTimes);
 };
 
+export type CheckResult =
+	| { ok: true; newSlots: string[] }
+	| { ok: false; skipped?: true };
+
 export const createWatchdogService = (deps: WatchdogDeps) => {
 	let failures = 0;
+	let skipTicks = 0;
 
 	const fail = async (error: FreshaError) => {
 		failures++;
-		log.warn({ failures, err: error.message }, "watchdog check failed");
+		if (isRateLimited(error)) {
+			skipTicks = Math.min(failures, MAX_SKIPPED_TICKS);
+		}
+		log.warn(
+			{ failures, skipTicks, err: error.message },
+			"watchdog check failed",
+		);
 
 		if (failures === ENV.FAILURE_ALERT_THRESHOLD) {
 			await deps.notify(
@@ -103,7 +120,13 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		failures = 0;
 	};
 
-	const check = async () => {
+	const check = async (): Promise<CheckResult> => {
+		if (skipTicks > 0) {
+			skipTicks--;
+			log.info({ skipTicks }, "watchdog check skipped after a 429");
+			return { ok: false, skipped: true };
+		}
+
 		const employeeId = String(ENV.FRESHA_EMPLOYEE_ID);
 		const slots = await retry(
 			() =>

@@ -26,13 +26,13 @@ const fake = (slots: Slot[]) => {
 	};
 };
 
-const failing = (message = "boom") => {
+const failing = (message = "boom", status?: number) => {
 	let calls = 0;
 	let slots: Slot[] | undefined;
 	return {
 		listSlots: (): Promise<Slot[] | FreshaError> => {
 			calls++;
-			return Promise.resolve(slots ?? new FreshaError(message, "http"));
+			return Promise.resolve(slots ?? new FreshaError(message, "http", status));
 		},
 		recover: (next: Slot[]) => {
 			slots = next;
@@ -83,6 +83,20 @@ describe("retry", () => {
 		expect((result as FreshaError).message).toBe("fail 3");
 		expect(calls).toBe(3);
 		expect(waits).toHaveLength(2);
+	});
+
+	test("gives up at once on a 429", async () => {
+		let calls = 0;
+		const fn = () => {
+			calls++;
+			return Promise.resolve(new FreshaError("HTTP 429", "http", 429));
+		};
+
+		const result = await retry(fn, 5, sleep);
+
+		expect(result).toBeInstanceOf(FreshaError);
+		expect(calls).toBe(1);
+		expect(waits).toEqual([]);
 	});
 });
 
@@ -213,6 +227,52 @@ describe("check", () => {
 		await watchdog.check();
 
 		expect(sent).toEqual([]);
+	});
+
+	test("backs off across ticks after a 429", async () => {
+		const fresha = failing("HTTP 429", 429);
+		const watchdog = service(fresha);
+
+		expect(await watchdog.check()).toEqual({ ok: false });
+		expect(fresha.calls).toBe(1);
+
+		// first 429: skip one tick
+		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
+		expect(fresha.calls).toBe(1);
+
+		// second 429: skip two ticks
+		expect(await watchdog.check()).toEqual({ ok: false });
+		expect(fresha.calls).toBe(2);
+		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
+		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
+		expect(fresha.calls).toBe(2);
+
+		fresha.recover([slotA]);
+		expect(await watchdog.check()).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30"],
+		});
+		expect(sent).toHaveLength(1);
+	});
+
+	test("never skips more than six ticks in a row", async () => {
+		const fresha = failing("HTTP 429", 429);
+		const watchdog = service(fresha);
+		const skippedPerRound: number[] = [];
+
+		// every non-skipped check hits Fresha and gets another 429
+		await watchdog.check();
+		for (let round = 0; round < 8; round++) {
+			let skipped = 0;
+			let result = await watchdog.check();
+			while (!result.ok && result.skipped) {
+				skipped++;
+				result = await watchdog.check();
+			}
+			skippedPerRound.push(skipped);
+		}
+
+		expect(skippedPerRound).toEqual([1, 2, 3, 4, 5, 6, 6, 6]);
 	});
 
 	test("does not persist when notify fails, so the next run alerts again", async () => {
