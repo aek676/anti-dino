@@ -4,7 +4,7 @@ import type { createFreshaService } from "@/modules/fresha/service";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 
-type Deps = {
+export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (text: string) => Promise<void>;
@@ -12,6 +12,7 @@ type Deps = {
 	sleep?: (ms: number) => Promise<void>;
 };
 
+const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2000;
 
 const defaultSleep = (ms: number) =>
@@ -80,18 +81,18 @@ const insertNewSlots = (
 	insertAll(startTimes);
 };
 
-export const createWatchdogService = (deps: Deps) => {
+export const createWatchdogService = (deps: WatchdogDeps) => {
 	const check = async () => {
 		const employeeId = String(ENV.FRESHA_EMPLOYEE_ID);
 		const slots = await retry(
 			() =>
 				deps.fresha.listSlots(
-					ENV.FRESHA_LOCATION_ID,
+					String(ENV.FRESHA_LOCATION_ID),
 					ENV.FRESHA_SERVICE_ID,
 					ENV.FRESHA_EMPLOYEE_ID,
-					ENV.MAX_DAYS_PER_CHECK,
+					ENV.DAYS_AHEAD,
 				),
-			ENV.FAILURE_ALERT_THRESHOLD,
+			RETRY_ATTEMPTS,
 			deps.sleep,
 		);
 

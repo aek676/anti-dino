@@ -166,7 +166,7 @@ describe("check", () => {
 		const result = await service(fresha).check();
 
 		expect(result).toEqual({ ok: false });
-		expect(fresha.calls).toBe(ENV.FAILURE_ALERT_THRESHOLD);
+		expect(fresha.calls).toBe(3);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]).toStartWith("Fresha API error");
 		expect(sent[0]).toContain("HTTP 503");
