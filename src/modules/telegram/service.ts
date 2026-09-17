@@ -1,4 +1,4 @@
-import type { Bot } from "grammy";
+import { type Bot, GrammyError } from "grammy";
 import type { Delivery } from "@/modules/watchdog";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
@@ -29,6 +29,23 @@ export const createTelegramService = (deps: TelegramDeps) => {
 			`SELECT chat_id FROM subscribers`,
 		);
 		return query.all().map((row) => row.chat_id);
+	};
+
+	const edit = async (chatId: number, messageId: number, text: string) => {
+		try {
+			await deps.bot.api.editMessageText(chatId, messageId, text);
+		} catch (error) {
+			if (
+				error instanceof GrammyError &&
+				error.description.includes("message is not modified")
+			)
+				return;
+
+			log.warn(
+				{ chatId, message: messageId, err: error },
+				"Failed to edit message",
+			);
+		}
 	};
 
 	const notify = async (text: string): Promise<Delivery> => {
@@ -64,5 +81,5 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		return ctx.reply("You have unsubscribed from notifications.");
 	});
 
-	return { subscribe, unsubscribe, listSubscribers, notify };
+	return { subscribe, unsubscribe, listSubscribers, notify, edit };
 };
