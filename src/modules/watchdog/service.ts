@@ -1,6 +1,7 @@
 import { ENV } from "varlock/env";
-import { FreshaError } from "@/modules/fresha/model";
+import { FreshaError, type FreshaModel } from "@/modules/fresha/model";
 import type { createFreshaService } from "@/modules/fresha/service";
+import { formatDay } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
@@ -41,6 +42,26 @@ export const retry = async <T>(
 
 	return lastError;
 };
+
+type Slot = FreshaModel["slot"];
+
+const slotKey = (slot: Slot) => `${slot.date}T${slot.time}`;
+
+const byDateTime = (a: Slot, b: Slot) =>
+	a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
+
+const formatSlots = (slots: Slot[]): string[] =>
+	Object.entries(
+		Object.groupBy(slots.toSorted(byDateTime), (slot) => slot.date),
+	).map(
+		([date, daySlots]) =>
+			`${formatDay(date)}: ${daySlots?.map((slot) => slot.time).join(", ")}`,
+	);
+
+const formatNewSlotsMessage = (slots: Slot[], bookingUrl: string): string =>
+	[`${slots.length} new slot(s):`, ...formatSlots(slots), bookingUrl].join(
+		"\n",
+	);
 
 const listKnownStartTimes = (
 	db: Db,
@@ -167,29 +188,27 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		if (slots instanceof FreshaError) return fail(slots);
 		await recover();
 
-		const startTimes = new Set(
-			slots.map((slot) => `${slot.date}T${slot.time}`),
-		);
+		const current = new Map(slots.map((slot) => [slotKey(slot), slot]));
 
 		const known = new Set(
 			listKnownStartTimes(deps.db, employeeId, ENV.FRESHA_SERVICE_ID),
 		);
 
-		const newStartTimes = [...startTimes].filter((slot) => !known.has(slot));
+		const newSlots = [...current].filter(([key]) => !known.has(key));
+		const newStartTimes = newSlots.map(([key]) => key);
 
-		const goneStartTimes = [...known].filter((slot) => !startTimes.has(slot));
+		const goneStartTimes = [...known].filter((key) => !current.has(key));
 
 		deleteGoneSlots(deps.db, employeeId, ENV.FRESHA_SERVICE_ID, goneStartTimes);
 
 		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
 
-		if (newStartTimes.length > 0) {
+		if (newSlots.length > 0) {
 			await deps.notify(
-				[
-					`${newStartTimes.length} new slot(s):`,
-					...newStartTimes,
+				formatNewSlotsMessage(
+					newSlots.map(([, slot]) => slot),
 					ENV.FRESHA_BOOKING_URL,
-				].join("\n"),
+				),
 			);
 		}
 

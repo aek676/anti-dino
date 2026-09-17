@@ -138,9 +138,13 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(1);
-		expect(sent[0]).toContain("2026-09-17T11:30");
-		expect(sent[0]).toContain("2026-09-17T11:45");
-		expect(sent[0]).toContain(ENV.FRESHA_BOOKING_URL);
+		expect(sent[0]).toBe(
+			[
+				"2 new slot(s):",
+				"jue, 17 sept: 11:30, 11:45",
+				ENV.FRESHA_BOOKING_URL,
+			].join("\n"),
+		);
 		expect(countSlots()).toBe(2);
 
 		const row = db
@@ -171,8 +175,8 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(2);
-		expect(sent[1]).toContain("2026-09-18T10:00");
-		expect(sent[1]).not.toContain("2026-09-17T11:30");
+		expect(sent[1]).toContain("vie, 18 sept: 10:00");
+		expect(sent[1]).not.toContain("11:30");
 		expect(countSlots()).toBe(3);
 	});
 
@@ -228,7 +232,7 @@ describe("check", () => {
 		expect(sent[1]).toBe(
 			`Fresha OK again after ${threshold + 1} failed checks`,
 		);
-		expect(sent[2]).toContain("2026-09-17T11:30");
+		expect(sent[2]).toContain("jue, 17 sept: 11:30");
 	});
 
 	test("a short failure streak recovers without any message", async () => {
