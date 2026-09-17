@@ -153,6 +153,19 @@ describe("check", () => {
 		expect(row?.seen_at).toBe("2026-09-14T10:00:00.000Z");
 	});
 
+	test("groups the alert by day in chronological order", async () => {
+		await service(fake([slotC, slotB, slotA])).check();
+
+		expect(sent[0]).toBe(
+			[
+				"3 new slot(s):",
+				"jue, 17 sept: 11:30, 11:45",
+				"vie, 18 sept: 10:00",
+				ENV.FRESHA_BOOKING_URL,
+			].join("\n"),
+		);
+	});
+
 	test("second run with the same slots is silent", async () => {
 		const watchdog = service(fake([slotA, slotB]));
 		await watchdog.check();
@@ -253,11 +266,9 @@ describe("check", () => {
 		expect(await watchdog.check()).toEqual({ ok: false });
 		expect(fresha.calls).toBe(1);
 
-		// first 429: skip one tick
 		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
 		expect(fresha.calls).toBe(1);
 
-		// second 429: skip two ticks
 		expect(await watchdog.check()).toEqual({ ok: false });
 		expect(fresha.calls).toBe(2);
 		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
@@ -278,7 +289,6 @@ describe("check", () => {
 		const watchdog = service(fresha);
 		const skippedPerRound: number[] = [];
 
-		// every non-skipped check hits Fresha and gets another 429
 		await watchdog.check();
 		for (let round = 0; round < 8; round++) {
 			let skipped = 0;
