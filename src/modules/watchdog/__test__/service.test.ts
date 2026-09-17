@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ENV } from "varlock/env";
-import { FreshaError, type FreshaModel } from "@/modules/fresha/model";
-import { createWatchdogService, retry } from "@/modules/watchdog/service";
+import { FreshaError, type FreshaModel } from "@/modules/fresha";
 import { type Db, openDatabase } from "@/utils/db";
+import { createWatchdogService, retry } from "../service";
 
 type Slot = FreshaModel["slot"];
 

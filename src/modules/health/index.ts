@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
-import { HealthModel } from "@/modules/health/model";
-import { createHealthService } from "@/modules/health/service";
 import type { Db } from "@/utils/db";
+import { HealthModel } from "./model";
+import { createHealthService } from "./service";
 
 export const HEALTH_PATH = "/healthz";
 

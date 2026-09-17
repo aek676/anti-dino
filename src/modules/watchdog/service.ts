@@ -1,6 +1,9 @@
 import { ENV } from "varlock/env";
-import { FreshaError, type FreshaModel } from "@/modules/fresha/model";
-import type { createFreshaService } from "@/modules/fresha/service";
+import {
+	type createFreshaService,
+	FreshaError,
+	type FreshaModel,
+} from "@/modules/fresha";
 import { formatDay } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";

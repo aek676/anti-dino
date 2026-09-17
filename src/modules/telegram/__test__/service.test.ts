@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Bot, Context } from "grammy";
-import { createTelegramService } from "@/modules/telegram/service";
 import { type Db, openDatabase } from "@/utils/db";
+import { createTelegramService } from "../service";
 
 type Command = (ctx: Context) => unknown;
 
