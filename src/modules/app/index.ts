@@ -1,10 +1,20 @@
 import { Elysia } from "elysia";
+import { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
+import { createTelegramService, telegram } from "@/modules/telegram";
 import { watchdog } from "@/modules/watchdog";
 import { closeDatabase, db } from "@/utils/db";
 import { log } from "@/utils/logger";
+
+const bot = new Bot(ENV.TELEGRAM_BOT_TOKEN);
+
+const telegramService = createTelegramService({
+	db,
+	bot,
+	adminChatId: ENV.ADMIN_CHAT_ID,
+});
 
 const app = new Elysia()
 	.use(
@@ -14,20 +24,17 @@ const app = new Elysia()
 	)
 	.use(health(db))
 	.decorate("db", db)
-	.use(fresha)
+	.use(fresha())
 	.use(
 		watchdog({
 			db,
 			fresha: createFreshaService(fetch, {
 				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
 			}),
-			// TODO: replace with the Telegram notifier
-			notify: (text) => {
-				log.info({ text }, "notify");
-				return Promise.resolve();
-			},
+			notify: telegramService.notify,
 		}),
 	)
+	.use(telegram(bot))
 	.onStop(({ store }) => {
 		store.cron.watchdog.stop();
 		closeDatabase(db);

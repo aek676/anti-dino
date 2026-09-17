@@ -138,15 +138,32 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(1);
-		expect(sent[0]).toContain("2026-09-17T11:30");
-		expect(sent[0]).toContain("2026-09-17T11:45");
-		expect(sent[0]).toContain(ENV.FRESHA_BOOKING_URL);
+		expect(sent[0]).toBe(
+			[
+				"2 new slot(s):",
+				"jue, 17 sept: 11:30, 11:45",
+				ENV.FRESHA_BOOKING_URL,
+			].join("\n"),
+		);
 		expect(countSlots()).toBe(2);
 
 		const row = db
 			.query<{ seen_at: string }, []>("SELECT seen_at FROM slots LIMIT 1")
 			.get();
 		expect(row?.seen_at).toBe("2026-09-14T10:00:00.000Z");
+	});
+
+	test("groups the alert by day in chronological order", async () => {
+		await service(fake([slotC, slotB, slotA])).check();
+
+		expect(sent[0]).toBe(
+			[
+				"3 new slot(s):",
+				"jue, 17 sept: 11:30, 11:45",
+				"vie, 18 sept: 10:00",
+				ENV.FRESHA_BOOKING_URL,
+			].join("\n"),
+		);
 	});
 
 	test("second run with the same slots is silent", async () => {
@@ -171,8 +188,8 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(2);
-		expect(sent[1]).toContain("2026-09-18T10:00");
-		expect(sent[1]).not.toContain("2026-09-17T11:30");
+		expect(sent[1]).toContain("vie, 18 sept: 10:00");
+		expect(sent[1]).not.toContain("11:30");
 		expect(countSlots()).toBe(3);
 	});
 
@@ -228,7 +245,7 @@ describe("check", () => {
 		expect(sent[1]).toBe(
 			`Fresha OK again after ${threshold + 1} failed checks`,
 		);
-		expect(sent[2]).toContain("2026-09-17T11:30");
+		expect(sent[2]).toContain("jue, 17 sept: 11:30");
 	});
 
 	test("a short failure streak recovers without any message", async () => {
@@ -249,11 +266,9 @@ describe("check", () => {
 		expect(await watchdog.check()).toEqual({ ok: false });
 		expect(fresha.calls).toBe(1);
 
-		// first 429: skip one tick
 		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
 		expect(fresha.calls).toBe(1);
 
-		// second 429: skip two ticks
 		expect(await watchdog.check()).toEqual({ ok: false });
 		expect(fresha.calls).toBe(2);
 		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
@@ -274,7 +289,6 @@ describe("check", () => {
 		const watchdog = service(fresha);
 		const skippedPerRound: number[] = [];
 
-		// every non-skipped check hits Fresha and gets another 429
 		await watchdog.check();
 		for (let round = 0; round < 8; round++) {
 			let skipped = 0;
