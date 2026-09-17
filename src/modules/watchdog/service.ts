@@ -9,10 +9,14 @@ import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 
+type ChatId = number;
+type MessageId = number;
+export type Delivery = Map<ChatId, MessageId>;
+
 export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
-	notify: (text: string) => Promise<void>;
+	notify: (text: string) => Promise<Delivery>;
 	now?: () => Date;
 	sleep?: Sleep;
 };

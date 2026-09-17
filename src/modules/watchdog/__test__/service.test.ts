@@ -103,9 +103,10 @@ describe("retry", () => {
 describe("check", () => {
 	let db: Db;
 	let sent: string[];
+	const chatId = 42;
 	const notify = (text: string) => {
 		sent.push(text);
-		return Promise.resolve();
+		return Promise.resolve(new Map([[chatId, sent.length]]));
 	};
 	const sleep = () => Promise.resolve();
 	const now = () => new Date("2026-09-14T10:00:00Z");

@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import type { Delivery } from "@/modules/watchdog";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 
@@ -30,13 +31,13 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		return query.all().map((row) => row.chat_id);
 	};
 
-	const notify = async (text: string) => {
+	const notify = async (text: string): Promise<Delivery> => {
 		const users = new Set([...listSubscribers(), deps.adminChatId]);
-		let delivered = 0;
+		const delivered = new Map();
 		for (const chatId of users) {
 			try {
-				await deps.bot.api.sendMessage(chatId, text);
-				delivered++;
+				const { message_id } = await deps.bot.api.sendMessage(chatId, text);
+				delivered.set(chatId, message_id);
 			} catch (error) {
 				log.warn(
 					{ chatId, err: error },
@@ -45,10 +46,12 @@ export const createTelegramService = (deps: TelegramDeps) => {
 			}
 		}
 
-		if (users.size > 0 && delivered <= 0)
+		if (users.size > 0 && delivered.size <= 0)
 			throw new Error(
-				`Failed to send message to subscribers. Delivered: ${delivered}, Total: ${users.size}`,
+				`Failed to send message to subscribers. Delivered: ${delivered.size}, Total: ${users.size}`,
 			);
+
+		return delivered;
 	};
 
 	deps.bot.command("start", (ctx) => {
