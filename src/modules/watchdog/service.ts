@@ -228,6 +228,14 @@ const listAlertStartTimes = (
 	return query.all({ chatId, messageId }).map((row) => row.starts_at);
 };
 
+const deleteExpiredAlerts = (db: Db, before: string) => {
+	const query = db.query<void, { before: string }>(
+		`DELETE FROM alerts WHERE starts_at < :before`,
+	);
+
+	query.run({ before });
+};
+
 export type CheckResult =
 	| { ok: true; newSlots: string[]; goneSlots: string[] }
 	| { ok: false; skipped?: true };
@@ -262,6 +270,10 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	};
 
 	const check = async (): Promise<CheckResult> => {
+		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
+
+		deleteExpiredAlerts(deps.db, seenAt);
+
 		if (skipTicks > 0) {
 			skipTicks--;
 			log.info({ skipTicks }, "watchdog check skipped after a 429");
@@ -316,8 +328,6 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 				),
 			);
 		}
-
-		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
 
 		if (newSlots.length > 0) {
 			const delivery = await deps.notify(

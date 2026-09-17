@@ -114,7 +114,8 @@ describe("check", () => {
 		return Promise.resolve();
 	};
 	const sleep = () => Promise.resolve();
-	const now = () => new Date("2026-09-14T10:00:00Z");
+	let clock: Date;
+	const now = () => clock;
 
 	const service = (fresha: {
 		listSlots: () => Promise<Slot[] | FreshaError>;
@@ -127,10 +128,15 @@ describe("check", () => {
 			)
 			.get(employeeId, serviceId)?.n ?? 0;
 
+	const countAlerts = () =>
+		db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM alerts").get()?.n ??
+		0;
+
 	beforeEach(() => {
 		db = openDatabase(":memory:");
 		sent = [];
 		edited = [];
+		clock = new Date("2026-09-14T10:00:00Z");
 	});
 	afterEach(() => {
 		db.close();
@@ -255,6 +261,17 @@ describe("check", () => {
 		expect(edited).toHaveLength(1);
 		expect(sent).toHaveLength(2);
 		expect(sent[1]).toContain("1 new slot(s):");
+	});
+
+	test("forgets alerts once their slot time has passed", async () => {
+		const watchdog = service(fake([slotA, slotB]));
+		await watchdog.check();
+		expect(countAlerts()).toBe(2);
+
+		clock = new Date("2026-09-17T11:40:00Z");
+		await watchdog.check();
+
+		expect(countAlerts()).toBe(1);
 	});
 
 	test("collapses duplicated slots", async () => {
