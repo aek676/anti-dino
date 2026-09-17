@@ -1,15 +1,23 @@
 import { ENV } from "varlock/env";
-import { FreshaError, type FreshaModel } from "@/modules/fresha/model";
-import type { createFreshaService } from "@/modules/fresha/service";
+import {
+	type createFreshaService,
+	FreshaError,
+	type FreshaModel,
+} from "@/modules/fresha";
 import { formatDay } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 
+type ChatId = number;
+type MessageId = number;
+export type Delivery = Map<ChatId, MessageId>;
+
 export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
-	notify: (text: string) => Promise<void>;
+	notify: (text: string) => Promise<Delivery>;
+	edit: (chatId: ChatId, messageId: MessageId, text: string) => Promise<void>;
 	now?: () => Date;
 	sleep?: Sleep;
 };
@@ -62,6 +70,25 @@ const formatNewSlotsMessage = (slots: Slot[], bookingUrl: string): string =>
 	[`${slots.length} new slot(s):`, ...formatSlots(slots), bookingUrl].join(
 		"\n",
 	);
+
+const toSlot = (startsAt: string): Slot => {
+	const [date = "", time = ""] = startsAt.split("T");
+	return { date, time };
+};
+
+const formatUpdatedMessage = (
+	startTimes: string[],
+	live: Set<string>,
+	bookingUrl: string,
+): string => {
+	const remaining = startTimes.filter((key) => live.has(key));
+	const header =
+		remaining.length > 0
+			? `${remaining.length} of ${startTimes.length} slot(s) still available:`
+			: "No slots left from this alert:";
+
+	return [header, ...formatSlots(remaining.map(toSlot)), bookingUrl].join("\n");
+};
 
 const listKnownStartTimes = (
 	db: Db,
@@ -132,6 +159,83 @@ const deleteGoneSlots = (
 	deleteAll(startTimes);
 };
 
+const insertNewAlerts = (
+	db: Db,
+	delivery: Delivery,
+	employeeId: string,
+	serviceId: string,
+	startTimes: string[],
+) => {
+	const query = db.query<
+		void,
+		{
+			chatId: number;
+			messageId: number;
+			employeeId: string;
+			serviceId: string;
+			startsAt: string;
+		}
+	>(
+		`INSERT OR IGNORE INTO alerts (chat_id, message_id, employee_id, service_id, starts_at) VALUES (:chatId, :messageId, :employeeId, :serviceId, :startsAt)`,
+	);
+
+	const insertAll = db.transaction((delivery: Delivery, values: string[]) => {
+		for (const [chatId, messageId] of delivery) {
+			for (const startsAt of values) {
+				query.run({
+					chatId,
+					messageId,
+					employeeId,
+					serviceId,
+					startsAt,
+				});
+			}
+		}
+	});
+
+	insertAll(delivery, startTimes);
+};
+
+const listAlertsFor = (
+	db: Db,
+	employeeId: string,
+	serviceId: string,
+	startTimes: string[],
+) => {
+	if (startTimes.length === 0) return [];
+
+	const placeholders = startTimes.map(() => `?`);
+	const query = db.query<{ chat_id: number; message_id: number }, string[]>(
+		`SELECT DISTINCT chat_id, message_id FROM alerts
+		 WHERE employee_id = ? AND service_id = ?
+		   AND starts_at IN (${placeholders.join(", ")})`,
+	);
+
+	return query.all(employeeId, serviceId, ...startTimes);
+};
+
+const listAlertStartTimes = (
+	db: Db,
+	chatId: ChatId,
+	messageId: MessageId,
+): string[] => {
+	const query = db.query<
+		{ starts_at: string },
+		{ chatId: ChatId; messageId: MessageId }
+	>(
+		"SELECT starts_at FROM alerts WHERE chat_id = :chatId AND message_id = :messageId ORDER BY starts_at",
+	);
+	return query.all({ chatId, messageId }).map((row) => row.starts_at);
+};
+
+const deleteExpiredAlerts = (db: Db, before: string) => {
+	const query = db.query<void, { before: string }>(
+		`DELETE FROM alerts WHERE starts_at < :before`,
+	);
+
+	query.run({ before });
+};
+
 export type CheckResult =
 	| { ok: true; newSlots: string[]; goneSlots: string[] }
 	| { ok: false; skipped?: true };
@@ -166,6 +270,10 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	};
 
 	const check = async (): Promise<CheckResult> => {
+		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
+
+		deleteExpiredAlerts(deps.db, seenAt);
+
 		if (skipTicks > 0) {
 			skipTicks--;
 			log.info({ skipTicks }, "watchdog check skipped after a 429");
@@ -199,16 +307,42 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		const goneStartTimes = [...known].filter((key) => !current.has(key));
 
+		const affected = listAlertsFor(
+			deps.db,
+			employeeId,
+			ENV.FRESHA_SERVICE_ID,
+			goneStartTimes,
+		);
+
 		deleteGoneSlots(deps.db, employeeId, ENV.FRESHA_SERVICE_ID, goneStartTimes);
 
-		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
+		const live = new Set(current.keys());
+		for (const { chat_id, message_id } of affected) {
+			await deps.edit(
+				chat_id,
+				message_id,
+				formatUpdatedMessage(
+					listAlertStartTimes(deps.db, chat_id, message_id),
+					live,
+					ENV.FRESHA_BOOKING_URL,
+				),
+			);
+		}
 
 		if (newSlots.length > 0) {
-			await deps.notify(
+			const delivery = await deps.notify(
 				formatNewSlotsMessage(
 					newSlots.map(([, slot]) => slot),
 					ENV.FRESHA_BOOKING_URL,
 				),
+			);
+
+			insertNewAlerts(
+				deps.db,
+				delivery,
+				employeeId,
+				ENV.FRESHA_SERVICE_ID,
+				newStartTimes,
 			);
 		}
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ElysiaCustomStatusResponse } from "elysia";
-import { createHealthService } from "@/modules/health/service";
 import { type Db, openDatabase } from "@/utils/db";
+import { createHealthService } from "../service";
 
 describe("health service", () => {
 	let db: Db;

@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Bot, Context } from "grammy";
-import { createTelegramService } from "@/modules/telegram/service";
 import { type Db, openDatabase } from "@/utils/db";
+import { createTelegramService } from "../service";
 
 type Command = (ctx: Context) => unknown;
 
 const fakeBot = (failFor: Set<number> = new Set()) => {
 	const sent: { chatId: number; text: string }[] = [];
 	const commands = new Map<string, Command>();
+	let messageId = 0;
 	const bot = {
 		api: {
 			sendMessage: (chatId: number, text: string) => {
 				if (failFor.has(chatId)) return Promise.reject(new Error("blocked"));
 				sent.push({ chatId, text });
-				return Promise.resolve();
+				messageId += 1;
+				return Promise.resolve({ message_id: messageId });
 			},
 		},
 		command: (name: string, handler: Command) => {

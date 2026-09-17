@@ -1,5 +1,5 @@
-import { FreshaError, type FreshaModel } from "@/modules/fresha/model";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
+import { FreshaError, type FreshaModel } from "./model";
 
 const ENDPOINT = "https://www.fresha.com/graphql";
 

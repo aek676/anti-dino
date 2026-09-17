@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { FreshaError } from "@/modules/fresha/model";
+import { FreshaError } from "../model";
 import {
 	createFreshaService,
 	type FetchFn,
 	parseEmployees,
 	parseServices,
 	parseSlots,
-} from "@/modules/fresha/service";
+} from "../service";
 import addService from "./fixtures/add-service.json";
 import day from "./fixtures/day.json";
 import employees from "./fixtures/employees.json";
