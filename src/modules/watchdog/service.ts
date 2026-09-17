@@ -139,6 +139,43 @@ const deleteGoneSlots = (
 	deleteAll(startTimes);
 };
 
+const insertNewAlerts = (
+	db: Db,
+	delivery: Delivery,
+	employeeId: string,
+	serviceId: string,
+	startTimes: string[],
+) => {
+	const query = db.query<
+		void,
+		{
+			chatId: number;
+			messageId: number;
+			employeeId: string;
+			serviceId: string;
+			startsAt: string;
+		}
+	>(
+		`INSERT OR IGNORE INTO alerts (chat_id, message_id, employee_id, service_id, starts_at) VALUES (:chatId, :messageId, :employeeId, :serviceId, :startsAt)`,
+	);
+
+	const insertAll = db.transaction((delivery: Delivery, values: string[]) => {
+		for (const [chatId, messageId] of delivery) {
+			for (const startsAt of values) {
+				query.run({
+					chatId,
+					messageId,
+					employeeId,
+					serviceId,
+					startsAt,
+				});
+			}
+		}
+	});
+
+	insertAll(delivery, startTimes);
+};
+
 export type CheckResult =
 	| { ok: true; newSlots: string[]; goneSlots: string[] }
 	| { ok: false; skipped?: true };
@@ -211,11 +248,19 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
 
 		if (newSlots.length > 0) {
-			await deps.notify(
+			const delivery = await deps.notify(
 				formatNewSlotsMessage(
 					newSlots.map(([, slot]) => slot),
 					ENV.FRESHA_BOOKING_URL,
 				),
+			);
+
+			insertNewAlerts(
+				deps.db,
+				delivery,
+				employeeId,
+				ENV.FRESHA_SERVICE_ID,
+				newStartTimes,
 			);
 		}
 
