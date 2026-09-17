@@ -103,17 +103,22 @@ describe("retry", () => {
 describe("check", () => {
 	let db: Db;
 	let sent: string[];
+	let edited: { chatId: number; messageId: number; text: string }[];
 	const chatId = 42;
 	const notify = (text: string) => {
 		sent.push(text);
 		return Promise.resolve(new Map([[chatId, sent.length]]));
+	};
+	const edit = (chatId: number, messageId: number, text: string) => {
+		edited.push({ chatId, messageId, text });
+		return Promise.resolve();
 	};
 	const sleep = () => Promise.resolve();
 	const now = () => new Date("2026-09-14T10:00:00Z");
 
 	const service = (fresha: {
 		listSlots: () => Promise<Slot[] | FreshaError>;
-	}) => createWatchdogService({ db, fresha, notify, now, sleep });
+	}) => createWatchdogService({ db, fresha, notify, edit, now, sleep });
 
 	const countSlots = () =>
 		db
@@ -125,6 +130,7 @@ describe("check", () => {
 	beforeEach(() => {
 		db = openDatabase(":memory:");
 		sent = [];
+		edited = [];
 	});
 	afterEach(() => {
 		db.close();
@@ -192,6 +198,63 @@ describe("check", () => {
 		expect(sent[1]).toContain("vie, 18 sept: 10:00");
 		expect(sent[1]).not.toContain("11:30");
 		expect(countSlots()).toBe(3);
+	});
+
+	test("drops a gone slot from the message that announced it", async () => {
+		await service(fake([slotA, slotB])).check();
+
+		const result = await service(fake([slotB])).check();
+
+		expect(result).toEqual({
+			ok: true,
+			newSlots: [],
+			goneSlots: ["2026-09-17T11:30"],
+		});
+		expect(edited).toHaveLength(1);
+		expect(edited[0]?.chatId).toBe(chatId);
+		expect(edited[0]?.messageId).toBe(1);
+		expect(edited[0]?.text).toBe(
+			[
+				"1 of 2 slot(s) still available:",
+				"jue, 17 sept: 11:45",
+				ENV.FRESHA_BOOKING_URL,
+			].join("\n"),
+		);
+		expect(sent).toHaveLength(1);
+	});
+
+	test("edits every message that mentioned a gone slot", async () => {
+		await service(fake([slotA])).check();
+		await service(fake([slotA, slotC])).check();
+
+		await service(fake([])).check();
+
+		expect(edited.map((call) => call.messageId)).toEqual([1, 2]);
+		expect(edited[0]?.text).toBe(
+			["No slots left from this alert:", ENV.FRESHA_BOOKING_URL].join("\n"),
+		);
+		expect(edited[1]?.text).toBe(
+			["No slots left from this alert:", ENV.FRESHA_BOOKING_URL].join("\n"),
+		);
+	});
+
+	test("does not edit anything while every slot is still there", async () => {
+		const watchdog = service(fake([slotA, slotB]));
+		await watchdog.check();
+		await watchdog.check();
+
+		expect(edited).toEqual([]);
+	});
+
+	test("restores a slot that comes back", async () => {
+		await service(fake([slotA, slotB])).check();
+		await service(fake([slotB])).check();
+
+		await service(fake([slotA, slotB])).check();
+
+		expect(edited).toHaveLength(1);
+		expect(sent).toHaveLength(2);
+		expect(sent[1]).toContain("1 new slot(s):");
 	});
 
 	test("collapses duplicated slots", async () => {
@@ -311,6 +374,7 @@ describe("check", () => {
 			fresha,
 			now,
 			sleep,
+			edit,
 			notify: () => Promise.reject(new Error("telegram down")),
 		});
 

@@ -17,6 +17,7 @@ export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (text: string) => Promise<Delivery>;
+	edit: (chatId: ChatId, messageId: MessageId, text: string) => Promise<void>;
 	now?: () => Date;
 	sleep?: Sleep;
 };
@@ -69,6 +70,25 @@ const formatNewSlotsMessage = (slots: Slot[], bookingUrl: string): string =>
 	[`${slots.length} new slot(s):`, ...formatSlots(slots), bookingUrl].join(
 		"\n",
 	);
+
+const toSlot = (startsAt: string): Slot => {
+	const [date = "", time = ""] = startsAt.split("T");
+	return { date, time };
+};
+
+const formatUpdatedMessage = (
+	startTimes: string[],
+	live: Set<string>,
+	bookingUrl: string,
+): string => {
+	const remaining = startTimes.filter((key) => live.has(key));
+	const header =
+		remaining.length > 0
+			? `${remaining.length} of ${startTimes.length} slot(s) still available:`
+			: "No slots left from this alert:";
+
+	return [header, ...formatSlots(remaining.map(toSlot)), bookingUrl].join("\n");
+};
 
 const listKnownStartTimes = (
 	db: Db,
@@ -176,6 +196,38 @@ const insertNewAlerts = (
 	insertAll(delivery, startTimes);
 };
 
+const listAlertsFor = (
+	db: Db,
+	employeeId: string,
+	serviceId: string,
+	startTimes: string[],
+) => {
+	if (startTimes.length === 0) return [];
+
+	const placeholders = startTimes.map(() => `?`);
+	const query = db.query<{ chat_id: number; message_id: number }, string[]>(
+		`SELECT DISTINCT chat_id, message_id FROM alerts
+		 WHERE employee_id = ? AND service_id = ?
+		   AND starts_at IN (${placeholders.join(", ")})`,
+	);
+
+	return query.all(employeeId, serviceId, ...startTimes);
+};
+
+const listAlertStartTimes = (
+	db: Db,
+	chatId: ChatId,
+	messageId: MessageId,
+): string[] => {
+	const query = db.query<
+		{ starts_at: string },
+		{ chatId: ChatId; messageId: MessageId }
+	>(
+		"SELECT starts_at FROM alerts WHERE chat_id = :chatId AND message_id = :messageId ORDER BY starts_at",
+	);
+	return query.all({ chatId, messageId }).map((row) => row.starts_at);
+};
+
 export type CheckResult =
 	| { ok: true; newSlots: string[]; goneSlots: string[] }
 	| { ok: false; skipped?: true };
@@ -243,7 +295,27 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		const goneStartTimes = [...known].filter((key) => !current.has(key));
 
+		const affected = listAlertsFor(
+			deps.db,
+			employeeId,
+			ENV.FRESHA_SERVICE_ID,
+			goneStartTimes,
+		);
+
 		deleteGoneSlots(deps.db, employeeId, ENV.FRESHA_SERVICE_ID, goneStartTimes);
+
+		const live = new Set(current.keys());
+		for (const { chat_id, message_id } of affected) {
+			await deps.edit(
+				chat_id,
+				message_id,
+				formatUpdatedMessage(
+					listAlertStartTimes(deps.db, chat_id, message_id),
+					live,
+					ENV.FRESHA_BOOKING_URL,
+				),
+			);
+		}
 
 		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
 
