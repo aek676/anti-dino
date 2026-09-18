@@ -79,6 +79,26 @@ describe("listServices", () => {
 		expect(result).toMatchObject({ kind: "http" });
 	});
 
+	test("keeps the Retry-After of a rate limited response", async () => {
+		const rateLimited: FetchFn = () =>
+			Promise.resolve(
+				Response.json({}, { status: 429, headers: { "retry-after": "711" } }),
+			);
+
+		const result = await createFreshaService(rateLimited).listServices(slug);
+
+		expect(result).toMatchObject({ status: 429, retryAfterSeconds: 711 });
+	});
+
+	test("leaves the Retry-After empty when Fresha does not send one", async () => {
+		const result = await createFreshaService(respond({}, 429)).listServices(
+			slug,
+		);
+
+		expect(result).toMatchObject({ status: 429 });
+		expect((result as FreshaError).retryAfterSeconds).toBeUndefined();
+	});
+
 	test("returns a graphql error when the response carries errors", async () => {
 		const result = await createFreshaService(
 			respond({ data: null, errors: [{ message: "Location not found" }] }),

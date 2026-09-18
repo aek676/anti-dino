@@ -143,6 +143,11 @@ export const parseSlots = (
 		? (day.timeslots ?? []).map((slot) => ({ date, time: slot.time }))
 		: [];
 
+const parseRetryAfter = (res: Response): number | undefined => {
+	const seconds = Number(res.headers.get("retry-after"));
+	return Number.isInteger(seconds) && seconds > 0 ? seconds : undefined;
+};
+
 export type FreshaOptions = {
 	stepDelayMs?: number;
 	sleep?: Sleep;
@@ -176,7 +181,12 @@ export const createFreshaService = (
 		});
 
 		if (!res.ok) {
-			return new FreshaError(`${name}: HTTP ${res.status}`, "http", res.status);
+			return new FreshaError(
+				`${name}: HTTP ${res.status}`,
+				"http",
+				res.status,
+				parseRetryAfter(res),
+			);
 		}
 
 		const body = (await res.json()) as GraphqlResponse<T>;
