@@ -1,4 +1,4 @@
-const LOCALE = "es-ES";
+const LOCALE = "en-US";
 
 export const formatWallClock = (
 	instant: Temporal.Instant,
