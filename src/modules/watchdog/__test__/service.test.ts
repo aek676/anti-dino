@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ENV } from "varlock/env";
 import { FreshaError, type FreshaModel } from "@/modules/fresha";
+import type { Message } from "@/modules/telegram";
 import { type Db, openDatabase } from "@/utils/db";
 import { createWatchdogService, retry } from "../service";
 
@@ -102,15 +103,18 @@ describe("retry", () => {
 
 describe("check", () => {
 	let db: Db;
-	let sent: string[];
-	let edited: { chatId: number; messageId: number; text: string }[];
+	let sent: Message[];
+	let edited: { chatId: number; messageId: number; message: Message }[];
 	const chatId = 42;
-	const notify = (text: string) => {
-		sent.push(text);
+	const bookButton = [
+		[{ label: "Book on Fresha", url: ENV.FRESHA_BOOKING_URL }],
+	];
+	const notify = (message: Message) => {
+		sent.push(message);
 		return Promise.resolve(new Map([[chatId, sent.length]]));
 	};
-	const edit = (chatId: number, messageId: number, text: string) => {
-		edited.push({ chatId, messageId, text });
+	const edit = (chatId: number, messageId: number, message: Message) => {
+		edited.push({ chatId, messageId, message });
 		return Promise.resolve();
 	};
 	const sleep = () => Promise.resolve();
@@ -151,13 +155,13 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(1);
-		expect(sent[0]).toBe(
-			[
-				"2 new slot(s):",
-				"Thu, Sep 17: 11:30, 11:45",
-				ENV.FRESHA_BOOKING_URL,
-			].join("\n"),
-		);
+		expect(sent[0]).toEqual({
+			text: [
+				"<b>🟢 2 new slots</b>",
+				"<b>Thu, Sep 17</b>\n<code>11:30</code>  <code>11:45</code>",
+			].join("\n\n"),
+			buttons: bookButton,
+		});
 		expect(countSlots()).toBe(2);
 
 		const row = db
@@ -169,13 +173,12 @@ describe("check", () => {
 	test("groups the alert by day in chronological order", async () => {
 		await service(fake([slotC, slotB, slotA])).check();
 
-		expect(sent[0]).toBe(
+		expect(sent[0]?.text).toBe(
 			[
-				"3 new slot(s):",
-				"Thu, Sep 17: 11:30, 11:45",
-				"Fri, Sep 18: 10:00",
-				ENV.FRESHA_BOOKING_URL,
-			].join("\n"),
+				"<b>🟢 3 new slots</b>",
+				"<b>Thu, Sep 17</b>\n<code>11:30</code>  <code>11:45</code>",
+				"<b>Fri, Sep 18</b>\n<code>10:00</code>",
+			].join("\n\n"),
 		);
 	});
 
@@ -201,12 +204,13 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(2);
-		expect(sent[1]).toContain("Fri, Sep 18: 10:00");
-		expect(sent[1]).not.toContain("11:30");
+		expect(sent[1]?.text).toContain("<b>🟢 1 new slot</b>");
+		expect(sent[1]?.text).toContain("<b>Fri, Sep 18</b>\n<code>10:00</code>");
+		expect(sent[1]?.text).not.toContain("11:30");
 		expect(countSlots()).toBe(3);
 	});
 
-	test("drops a gone slot from the message that announced it", async () => {
+	test("strikes a gone slot in the message that announced it", async () => {
 		await service(fake([slotA, slotB])).check();
 
 		const result = await service(fake([slotB])).check();
@@ -219,13 +223,13 @@ describe("check", () => {
 		expect(edited).toHaveLength(1);
 		expect(edited[0]?.chatId).toBe(chatId);
 		expect(edited[0]?.messageId).toBe(1);
-		expect(edited[0]?.text).toBe(
-			[
-				"1 of 2 slot(s) still available:",
-				"Thu, Sep 17: 11:45",
-				ENV.FRESHA_BOOKING_URL,
-			].join("\n"),
-		);
+		expect(edited[0]?.message).toEqual({
+			text: [
+				"<b>🟡 1 of 2 slots left</b>",
+				"<b>Thu, Sep 17</b>\n<s>11:30</s>  <code>11:45</code>",
+			].join("\n\n"),
+			buttons: bookButton,
+		});
 		expect(sent).toHaveLength(1);
 	});
 
@@ -236,12 +240,20 @@ describe("check", () => {
 		await service(fake([])).check();
 
 		expect(edited.map((call) => call.messageId)).toEqual([1, 2]);
-		expect(edited[0]?.text).toBe(
-			["No slots left from this alert:", ENV.FRESHA_BOOKING_URL].join("\n"),
-		);
-		expect(edited[1]?.text).toBe(
-			["No slots left from this alert:", ENV.FRESHA_BOOKING_URL].join("\n"),
-		);
+		expect(edited[0]?.message).toEqual({
+			text: [
+				"<b>⚪ No slots left from this alert</b>",
+				"<b>Thu, Sep 17</b>\n<s>11:30</s>",
+			].join("\n\n"),
+			buttons: [],
+		});
+		expect(edited[1]?.message).toEqual({
+			text: [
+				"<b>⚪ No slots left from this alert</b>",
+				"<b>Fri, Sep 18</b>\n<s>10:00</s>",
+			].join("\n\n"),
+			buttons: [],
+		});
 	});
 
 	test("does not edit anything while every slot is still there", async () => {
@@ -260,7 +272,7 @@ describe("check", () => {
 
 		expect(edited).toHaveLength(1);
 		expect(sent).toHaveLength(2);
-		expect(sent[1]).toContain("1 new slot(s):");
+		expect(sent[1]?.text).toContain("1 new slot");
 	});
 
 	test("forgets alerts once their slot time has passed", async () => {
@@ -307,9 +319,9 @@ describe("check", () => {
 
 		await watchdog.check();
 		expect(sent).toHaveLength(1);
-		expect(sent[0]).toBe(
-			`Fresha API error (${threshold} checks in a row): HTTP 503`,
-		);
+		expect(sent[0]).toEqual({
+			text: `Fresha API error (${threshold} checks in a row): HTTP 503`,
+		});
 
 		await watchdog.check();
 		expect(sent).toHaveLength(1);
@@ -323,10 +335,10 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(3);
-		expect(sent[1]).toBe(
-			`Fresha OK again after ${threshold + 1} failed checks`,
-		);
-		expect(sent[2]).toContain("Thu, Sep 17: 11:30");
+		expect(sent[1]).toEqual({
+			text: `Fresha OK again after ${threshold + 1} failed checks`,
+		});
+		expect(sent[2]?.text).toContain("<b>Thu, Sep 17</b>\n<code>11:30</code>");
 	});
 
 	test("a short failure streak recovers without any message", async () => {
@@ -421,6 +433,14 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(1);
 		expect(countSlots()).toBe(1);
+	});
+
+	test("escapes the Fresha error in the failure alert", async () => {
+		const watchdog = service(failing("unexpected <html> & more"));
+
+		for (let i = 0; i < threshold; i++) await watchdog.check();
+
+		expect(sent[0]?.text).toContain("unexpected &lt;html&gt; &amp; more");
 	});
 
 	test("reports a slot again when it comes back", async () => {
