@@ -4,8 +4,6 @@ import { ENV } from "varlock/env";
 import { log } from "@/utils/logger";
 import { createWatchdogService, type WatchdogDeps } from "./service";
 
-export type { Delivery } from "./model";
-
 export const watchdog = (deps: WatchdogDeps) => {
 	const watchdogService = createWatchdogService(deps);
 

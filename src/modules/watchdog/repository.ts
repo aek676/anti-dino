@@ -1,5 +1,5 @@
+import type { ChatId, Delivery, MessageId } from "@/modules/telegram";
 import type { Db } from "@/utils/db";
-import type { ChatId, Delivery, MessageId } from "./model";
 
 export type WatchTarget = { employeeId: string; serviceId: string };
 

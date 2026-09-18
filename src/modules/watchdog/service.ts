@@ -4,11 +4,11 @@ import {
 	FreshaError,
 	type FreshaModel,
 } from "@/modules/fresha";
+import type { ChatId, Delivery, MessageId } from "@/modules/telegram";
 import { formatDay, formatWallClock } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
-import type { ChatId, Delivery, MessageId } from "./model";
 import { createWatchdogRepository, type WatchTarget } from "./repository";
 
 export type WatchdogDeps = {
