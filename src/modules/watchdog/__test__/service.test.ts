@@ -26,13 +26,19 @@ const fake = (slots: Slot[]) => {
 	};
 };
 
-const failing = (message = "boom", status?: number) => {
+const failing = (
+	message = "boom",
+	status?: number,
+	retryAfterSeconds?: number,
+) => {
 	let calls = 0;
 	let slots: Slot[] | undefined;
 	return {
 		listSlots: (): Promise<Slot[] | FreshaError> => {
 			calls++;
-			return Promise.resolve(slots ?? new FreshaError(message, "http", status));
+			return Promise.resolve(
+				slots ?? new FreshaError(message, "http", status, retryAfterSeconds),
+			);
 		},
 		recover: (next: Slot[]) => {
 			slots = next;
@@ -363,6 +369,26 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(1);
+	});
+
+	test("waits out the Retry-After of a 429 instead of guessing", async () => {
+		const fresha = failing("HTTP 429", 429, 711);
+		const watchdog = service(fresha);
+
+		expect(await watchdog.check()).toEqual({ ok: false });
+
+		clock = clock.add({ seconds: 710 });
+		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
+		expect(fresha.calls).toBe(1);
+
+		fresha.recover([slotA]);
+		clock = clock.add({ seconds: 1 });
+		expect(await watchdog.check()).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30"],
+			goneSlots: [],
+		});
+		expect(fresha.calls).toBe(2);
 	});
 
 	test("never skips more than six ticks in a row", async () => {

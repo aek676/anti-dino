@@ -97,14 +97,24 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	const repo = createWatchdogRepository(deps.db);
 	let failures = 0;
 	let skipTicks = 0;
+	let skipUntil: Temporal.Instant | null = null;
 
-	const fail = async (error: FreshaError) => {
+	const fail = async (error: FreshaError, now: Temporal.Instant) => {
 		failures++;
 		if (isRateLimited(error)) {
-			skipTicks = Math.min(failures, MAX_SKIPPED_TICKS);
+			if (error.retryAfterSeconds) {
+				skipUntil = now.add({ seconds: error.retryAfterSeconds });
+			} else {
+				skipTicks = Math.min(failures, MAX_SKIPPED_TICKS);
+			}
 		}
 		log.warn(
-			{ failures, skipTicks, err: error.message },
+			{
+				failures,
+				skipTicks,
+				skipUntil: skipUntil?.toString(),
+				err: error.message,
+			},
 			"watchdog check failed",
 		);
 
@@ -132,6 +142,15 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		repo.deleteAlertsBefore(salonNow);
 
+		if (skipUntil && Temporal.Instant.compare(now, skipUntil) < 0) {
+			log.info(
+				{ skipUntil: skipUntil.toString() },
+				"watchdog check skipped until Fresha's Retry-After",
+			);
+			return { ok: false, skipped: true };
+		}
+		skipUntil = null;
+
 		if (skipTicks > 0) {
 			skipTicks--;
 			log.info({ skipTicks }, "watchdog check skipped after a 429");
@@ -155,7 +174,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			deps.sleep,
 		);
 
-		if (slots instanceof FreshaError) return fail(slots);
+		if (slots instanceof FreshaError) return fail(slots, now);
 		await recover();
 
 		const current = new Map(slots.map((slot) => [slotKey(slot), slot]));
