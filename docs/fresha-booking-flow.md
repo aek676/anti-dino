@@ -77,3 +77,13 @@ otro con `onScreenTimeSet` (`{"type":"onScreenTimeSet","date":"YYYY-MM-DD","time
 Abrir después `…/booking?cartId=<uuid>` muestra la pantalla de horas con ese hueco seleccionado
 (comprobado en Chromium, sep 2026). Los `action.id` son JSON determinista, así que se pueden construir
 sin leerlos de la respuesta anterior.
+
+## Rate limit
+
+Sondeo del 18 sep 2026 desde una IP doméstica: 76 `Initialize` en ~75 s pasaron con 200 y la ráfaga
+siguiente (80 en paralelo) fue rechazada entera. El límite lo aplica la aplicación, no el WAF: HTTP 429
+con cabecera `retry-after: <segundos>` y un error GraphQL `extensions.code: "RATE_LIMITED"` cuyo `path`
+es la mutación (`bookingFlowInitialize`), así que el contador parece ser por operación. `retry-after`
+es una cuenta atrás real hasta una hora fija de desbloqueo, unos 12 minutos después del corte; pasada
+esa hora la misma petición volvió a dar 200. Las respuestas normales no traen cabeceras `ratelimit-*`.
+Sin comprobar: si el contador es por IP y qué límite tiene `ActionButtonPressed`.
