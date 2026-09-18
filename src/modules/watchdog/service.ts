@@ -205,14 +205,20 @@ const listAlertsFor = (
 ) => {
 	if (startTimes.length === 0) return [];
 
-	const placeholders = startTimes.map(() => `?`);
-	const query = db.query<{ chat_id: number; message_id: number }, string[]>(
+	const query = db.query<
+		{ chat_id: number; message_id: number },
+		{ employeeId: string; serviceId: string; startTimes: string }
+	>(
 		`SELECT DISTINCT chat_id, message_id FROM alerts
-		 WHERE employee_id = ? AND service_id = ?
-		   AND starts_at IN (${placeholders.join(", ")})`,
+		 WHERE employee_id = :employeeId AND service_id = :serviceId
+		   AND starts_at IN (SELECT value FROM json_each(:startTimes))`,
 	);
 
-	return query.all(employeeId, serviceId, ...startTimes);
+	return query.all({
+		employeeId,
+		serviceId,
+		startTimes: JSON.stringify(startTimes),
+	});
 };
 
 const listAlertStartTimes = (
