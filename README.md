@@ -10,13 +10,20 @@
 Env vars are declared in `.env.schema`. Secrets live in
 [Bitwarden Secrets Manager](https://bitwarden.com/products/secrets-manager/) and
 are referenced from the schema by id, so the only secret you hold locally is a
-machine account access token. Shared development defaults are committed in
-`.env.development`; create a gitignored `.env.local` with the values that are
-yours alone:
+machine account access token. Shared defaults are committed per environment in
+`.env.development` and `.env.production`, each pointing at its own Telegram bot.
+The schema has no bot on purpose, so a missing environment file fails validation
+instead of silently using production. Create the gitignored files with the values
+that are yours alone:
 
 ```bash
+# Loaded in every environment
 cat > .env.local <<'EOT'
 BITWARDEN_ACCESS_TOKEN=<machine account token>
+EOT
+
+# Loaded only in development, so the tunnel never ends up in a production load
+cat > .env.development.local <<'EOT'
 PUBLIC_URL=<public URL of your tunnel>
 ADMIN_CHAT_ID=<your Telegram chat id>
 EOT
@@ -60,9 +67,11 @@ docker compose logs -f
 docker compose stop
 ```
 
-The first command fails if anything is missing or invalid, so a bad config never
-reaches the container. Re-run it after changing `.env.schema` or any `.env`
-value: the running container keeps the blob it started with. If the plaintext
+It reads `.env.production` plus a gitignored `.env.production.local` holding the
+production `PUBLIC_URL` and `ADMIN_CHAT_ID`. The first command fails if anything
+is missing or invalid, so a bad config never reaches the container. Re-run it
+after changing `.env.schema` or any `.env` value: the running container keeps
+the blob it started with. If the plaintext
 blob should not sit in the environment, Varlock also accepts an encrypted blob
 (`varlock:v1:...`) plus `_VARLOCK_ENV_KEY`.
 
