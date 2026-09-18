@@ -51,3 +51,29 @@ encajaba con el estado del carrito (por ejemplo, un modal abierto).
 - `dates[]` trae 31 días con `isAvailableToBeBooked`; solo hay que abrir los días marcados.
 - Los huecos vienen como `time: "12:15"` (hora local del centro) y `action.id` con `time` en
   segundos desde medianoche. No incluyen zona horaria; hay que asumir `Europe/Madrid`.
+
+## Disponibilidad por ventanas
+
+Cada entrada de `dates[]` trae también `isLoading`. Fresha solo calcula la disponibilidad de unas dos
+semanas alrededor del día que el carrito tiene abierto; fuera de esa ventana devuelve `isLoading: true`
+con `isAvailableToBeBooked: true` como valor de relleno. El flag solo es fiable cuando `isLoading` es
+`false`. Abrir un día en carga devuelve sus huecos reales (comprobado sep 2026).
+
+## Enlaces directos al widget
+
+La página `/a/<locationSlug>/booking` pasa varios parámetros de la URL a `Initialize` (`options`):
+
+| Parámetro | Efecto |
+|---|---|
+| `offerItems=sv:18605549` | El servicio llega ya añadido al carrito (`isSelected: true`). |
+| `employeeId=3182031` | Fija el empleado y salta la pantalla de empleados. |
+| `preferredDate=YYYY-MM-DD` | La pantalla de horas abre en ese día. |
+| `preferredTimeslot` | No selecciona la hora (probado `HH:MM`, segundos e ISO); el cliente solo lo usa para analítica. |
+| `cartId=<uuid>` | Reanuda ese carrito tal cual quedó. |
+
+Para abrir con una hora ya marcada hay que preparar el carrito desde el servidor: `Initialize` con
+`offerItems`, `employeeId` y `preferredDate`, `ActionButtonPressed` con `onScreenServicesContinue` y
+otro con `onScreenTimeSet` (`{"type":"onScreenTimeSet","date":"YYYY-MM-DD","time":<segundos>,"autoContinue":false,"pricesShownOnDay":false}`).
+Abrir después `…/booking?cartId=<uuid>` muestra la pantalla de horas con ese hueco seleccionado
+(comprobado en Chromium, sep 2026). Los `action.id` son JSON determinista, así que se pueden construir
+sin leerlos de la respuesta anterior.
