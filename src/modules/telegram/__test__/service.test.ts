@@ -10,26 +10,44 @@ import {
 import { type Bot, type Context, GrammyError } from "grammy";
 import { type Db, openDatabase } from "@/utils/db";
 import { log } from "@/utils/logger";
+import type { Message } from "../model";
 import { createTelegramService } from "../service";
 
 type Command = (ctx: Context) => unknown;
+type Options = {
+	parse_mode?: string;
+	link_preview_options?: { is_disabled: boolean };
+	reply_markup?: { inline_keyboard: { text: string; url?: string }[][] };
+};
+
+const hello: Message = { text: "hello" };
 
 const fakeBot = (failFor: Set<number> = new Set(), editError?: unknown) => {
-	const sent: { chatId: number; text: string }[] = [];
-	const edited: { chatId: number; messageId: number; text: string }[] = [];
+	const sent: { chatId: number; text: string; options?: Options }[] = [];
+	const edited: {
+		chatId: number;
+		messageId: number;
+		text: string;
+		options?: Options;
+	}[] = [];
 	const commands = new Map<string, Command>();
 	let messageId = 0;
 	const bot = {
 		api: {
-			sendMessage: (chatId: number, text: string) => {
+			sendMessage: (chatId: number, text: string, options?: Options) => {
 				if (failFor.has(chatId)) return Promise.reject(new Error("blocked"));
-				sent.push({ chatId, text });
+				sent.push({ chatId, text, options });
 				messageId += 1;
 				return Promise.resolve({ message_id: messageId });
 			},
-			editMessageText: (chatId: number, messageId: number, text: string) => {
+			editMessageText: (
+				chatId: number,
+				messageId: number,
+				text: string,
+				options?: Options,
+			) => {
 				if (editError) return Promise.reject(editError);
-				edited.push({ chatId, messageId, text });
+				edited.push({ chatId, messageId, text, options });
 				return Promise.resolve(true);
 			},
 		},
@@ -94,7 +112,7 @@ describe("telegram service", () => {
 		service.subscribe(10);
 		service.subscribe(ADMIN);
 
-		await service.notify("hello");
+		await service.notify(hello);
 
 		expect(sent.map((m) => m.chatId).toSorted()).toEqual([ADMIN, 10]);
 		expect(sent.every((m) => m.text === "hello")).toBe(true);
@@ -104,9 +122,9 @@ describe("telegram service", () => {
 		const { bot, sent } = fakeBot();
 		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
-		await service.notify("hello");
+		await service.notify(hello);
 
-		expect(sent).toEqual([{ chatId: ADMIN, text: "hello" }]);
+		expect(sent.map((m) => [m.chatId, m.text])).toEqual([[ADMIN, "hello"]]);
 	});
 
 	test("notify keeps going when one chat rejects the message", async () => {
@@ -115,7 +133,7 @@ describe("telegram service", () => {
 		service.subscribe(10);
 		service.subscribe(20);
 
-		await service.notify("hello");
+		await service.notify(hello);
 
 		expect(sent.map((m) => m.chatId).toSorted()).toEqual([ADMIN, 20]);
 	});
@@ -125,16 +143,45 @@ describe("telegram service", () => {
 		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 		service.subscribe(10);
 
-		expect(service.notify("hello")).rejects.toThrow(/Delivered: 0, Total: 2/);
+		expect(service.notify(hello)).rejects.toThrow(/Delivered: 0, Total: 2/);
+	});
+
+	test("notify sends HTML with the buttons as an inline URL keyboard", async () => {
+		const { bot, sent } = fakeBot();
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
+
+		await service.notify({
+			text: "<b>hello</b>",
+			buttons: [[{ label: "Book", url: "https://example.com/book" }]],
+		});
+
+		expect(sent[0]?.options?.parse_mode).toBe("HTML");
+		expect(sent[0]?.options?.link_preview_options).toEqual({
+			is_disabled: true,
+		});
+		expect(sent[0]?.options?.reply_markup?.inline_keyboard).toEqual([
+			[{ text: "Book", url: "https://example.com/book" }],
+		]);
 	});
 
 	test("edit rewrites the message text", async () => {
 		const { bot, edited } = fakeBot();
 		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
-		await service.edit(10, 5, "new text");
+		await service.edit(10, 5, { text: "new text" });
 
-		expect(edited).toEqual([{ chatId: 10, messageId: 5, text: "new text" }]);
+		expect(edited.map((m) => [m.chatId, m.messageId, m.text])).toEqual([
+			[10, 5, "new text"],
+		]);
+	});
+
+	test("edit without buttons clears the keyboard", async () => {
+		const { bot, edited } = fakeBot();
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
+
+		await service.edit(10, 5, { text: "new text" });
+
+		expect(edited[0]?.options?.reply_markup?.inline_keyboard).toEqual([]);
 	});
 
 	test("edit ignores Telegram's 'message is not modified' error", async () => {
@@ -152,7 +199,7 @@ describe("telegram service", () => {
 		const { bot } = fakeBot(new Set(), notModified);
 		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
-		await service.edit(10, 5, "same text");
+		await service.edit(10, 5, { text: "same text" });
 
 		expect(warn).not.toHaveBeenCalled();
 	});
@@ -161,7 +208,7 @@ describe("telegram service", () => {
 		const { bot } = fakeBot(new Set(), new Error("message can't be edited"));
 		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
-		await service.edit(10, 5, "new text");
+		await service.edit(10, 5, { text: "new text" });
 
 		expect(warn).toHaveBeenCalledTimes(1);
 	});
