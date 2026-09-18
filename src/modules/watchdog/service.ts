@@ -51,14 +51,12 @@ export const retry = async <T>(
 	return lastError;
 };
 
-type Slot = FreshaModel["slot"];
+const slotKey = (slot: FreshaModel["slot"]) => `${slot.date}T${slot.time}`;
 
-const slotKey = (slot: Slot) => `${slot.date}T${slot.time}`;
-
-const byDateTime = (a: Slot, b: Slot) =>
+const byDateTime = (a: FreshaModel["slot"], b: FreshaModel["slot"]) =>
 	a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
 
-const formatSlots = (slots: Slot[]): string[] =>
+const formatSlots = (slots: FreshaModel["slot"][]): string[] =>
 	Object.entries(
 		Object.groupBy(slots.toSorted(byDateTime), (slot) => slot.date),
 	).map(
@@ -66,12 +64,15 @@ const formatSlots = (slots: Slot[]): string[] =>
 			`${formatDay(date)}: ${daySlots?.map((slot) => slot.time).join(", ")}`,
 	);
 
-const formatNewSlotsMessage = (slots: Slot[], bookingUrl: string): string =>
+const formatNewSlotsMessage = (
+	slots: FreshaModel["slot"][],
+	bookingUrl: string,
+): string =>
 	[`${slots.length} new slot(s):`, ...formatSlots(slots), bookingUrl].join(
 		"\n",
 	);
 
-const toSlot = (startsAt: string): Slot => {
+const toSlot = (startsAt: string): FreshaModel["slot"] => {
 	const [date = "", time = ""] = startsAt.split("T");
 	return { date, time };
 };
