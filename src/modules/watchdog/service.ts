@@ -8,10 +8,8 @@ import { formatDay, formatWallClock } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
-
-type ChatId = number;
-type MessageId = number;
-export type Delivery = Map<ChatId, MessageId>;
+import type { ChatId, Delivery, MessageId } from "./model";
+import { createWatchdogRepository, type WatchTarget } from "./repository";
 
 export type WatchdogDeps = {
 	db: Db;
@@ -91,163 +89,12 @@ const formatUpdatedMessage = (
 	return [header, ...formatSlots(remaining.map(toSlot)), bookingUrl].join("\n");
 };
 
-const listKnownStartTimes = (
-	db: Db,
-	employeeId: string,
-	serviceId: string,
-): string[] => {
-	const query = db.query<
-		{ starts_at: string },
-		{ employeeId: string; serviceId: string }
-	>(
-		"SELECT starts_at FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId ORDER BY starts_at",
-	);
-	return query.all({ employeeId, serviceId }).map((row) => row.starts_at);
-};
-
-const insertNewSlots = (
-	db: Db,
-	employeeId: string,
-	serviceId: string,
-	startTimes: string[],
-	seenAt: string,
-) => {
-	const query = db.query<
-		void,
-		{
-			employeeId: string;
-			serviceId: string;
-			startsAt: string;
-			seenAt: string;
-		}
-	>(
-		`INSERT OR IGNORE INTO slots (employee_id, service_id, starts_at, seen_at)
-		 VALUES (:employeeId, :serviceId, :startsAt, :seenAt)`,
-	);
-
-	const insertAll = db.transaction((values: string[]) => {
-		for (const startsAt of values) {
-			query.run({ employeeId, serviceId, startsAt, seenAt });
-		}
-	});
-
-	insertAll(startTimes);
-};
-
-const deleteGoneSlots = (
-	db: Db,
-	employeeId: string,
-	serviceId: string,
-	startTimes: string[],
-) => {
-	const query = db.query<
-		void,
-		{
-			employeeId: string;
-			serviceId: string;
-			startsAt: string;
-		}
-	>(
-		`DELETE FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId AND starts_at = :startsAt`,
-	);
-
-	const deleteAll = db.transaction((values: string[]) => {
-		for (const startsAt of values) {
-			query.run({ employeeId, serviceId, startsAt });
-		}
-	});
-
-	deleteAll(startTimes);
-};
-
-const insertNewAlerts = (
-	db: Db,
-	delivery: Delivery,
-	employeeId: string,
-	serviceId: string,
-	startTimes: string[],
-) => {
-	const query = db.query<
-		void,
-		{
-			chatId: number;
-			messageId: number;
-			employeeId: string;
-			serviceId: string;
-			startsAt: string;
-		}
-	>(
-		`INSERT OR IGNORE INTO alerts (chat_id, message_id, employee_id, service_id, starts_at) VALUES (:chatId, :messageId, :employeeId, :serviceId, :startsAt)`,
-	);
-
-	const insertAll = db.transaction((delivery: Delivery, values: string[]) => {
-		for (const [chatId, messageId] of delivery) {
-			for (const startsAt of values) {
-				query.run({
-					chatId,
-					messageId,
-					employeeId,
-					serviceId,
-					startsAt,
-				});
-			}
-		}
-	});
-
-	insertAll(delivery, startTimes);
-};
-
-const listAlertsFor = (
-	db: Db,
-	employeeId: string,
-	serviceId: string,
-	startTimes: string[],
-) => {
-	if (startTimes.length === 0) return [];
-
-	const query = db.query<
-		{ chat_id: number; message_id: number },
-		{ employeeId: string; serviceId: string; startTimes: string }
-	>(
-		`SELECT DISTINCT chat_id, message_id FROM alerts
-		 WHERE employee_id = :employeeId AND service_id = :serviceId
-		   AND starts_at IN (SELECT value FROM json_each(:startTimes))`,
-	);
-
-	return query.all({
-		employeeId,
-		serviceId,
-		startTimes: JSON.stringify(startTimes),
-	});
-};
-
-const listAlertStartTimes = (
-	db: Db,
-	chatId: ChatId,
-	messageId: MessageId,
-): string[] => {
-	const query = db.query<
-		{ starts_at: string },
-		{ chatId: ChatId; messageId: MessageId }
-	>(
-		"SELECT starts_at FROM alerts WHERE chat_id = :chatId AND message_id = :messageId ORDER BY starts_at",
-	);
-	return query.all({ chatId, messageId }).map((row) => row.starts_at);
-};
-
-const deleteExpiredAlerts = (db: Db, before: string) => {
-	const query = db.query<void, { before: string }>(
-		`DELETE FROM alerts WHERE starts_at < :before`,
-	);
-
-	query.run({ before });
-};
-
 export type CheckResult =
 	| { ok: true; newSlots: string[]; goneSlots: string[] }
 	| { ok: false; skipped?: true };
 
 export const createWatchdogService = (deps: WatchdogDeps) => {
+	const repo = createWatchdogRepository(deps.db);
 	let failures = 0;
 	let skipTicks = 0;
 
@@ -283,7 +130,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		});
 		const salonNow = formatWallClock(now, ENV.SALON_TIME_ZONE);
 
-		deleteExpiredAlerts(deps.db, salonNow);
+		repo.deleteAlertsBefore(salonNow);
 
 		if (skipTicks > 0) {
 			skipTicks--;
@@ -291,7 +138,11 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			return { ok: false, skipped: true };
 		}
 
-		const employeeId = String(ENV.FRESHA_EMPLOYEE_ID);
+		const target: WatchTarget = {
+			employeeId: String(ENV.FRESHA_EMPLOYEE_ID),
+			serviceId: ENV.FRESHA_SERVICE_ID,
+		};
+
 		const slots = await retry(
 			() =>
 				deps.fresha.listSlots(
@@ -309,31 +160,24 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		const current = new Map(slots.map((slot) => [slotKey(slot), slot]));
 
-		const known = new Set(
-			listKnownStartTimes(deps.db, employeeId, ENV.FRESHA_SERVICE_ID),
-		);
+		const known = new Set(repo.listSlotStartTimes(target));
 
 		const newSlots = [...current].filter(([key]) => !known.has(key));
 		const newStartTimes = newSlots.map(([key]) => key);
 
 		const goneStartTimes = [...known].filter((key) => !current.has(key));
 
-		const affected = listAlertsFor(
-			deps.db,
-			employeeId,
-			ENV.FRESHA_SERVICE_ID,
-			goneStartTimes,
-		);
+		const affected = repo.listAlertMessages(target, goneStartTimes);
 
-		deleteGoneSlots(deps.db, employeeId, ENV.FRESHA_SERVICE_ID, goneStartTimes);
+		repo.deleteSlots(target, goneStartTimes);
 
 		const live = new Set(current.keys());
-		for (const { chat_id, message_id } of affected) {
+		for (const { chatId, messageId } of affected) {
 			await deps.edit(
-				chat_id,
-				message_id,
+				chatId,
+				messageId,
 				formatUpdatedMessage(
-					listAlertStartTimes(deps.db, chat_id, message_id),
+					repo.listAlertStartTimes(chatId, messageId),
 					live,
 					ENV.FRESHA_BOOKING_URL,
 				),
@@ -348,22 +192,10 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 				),
 			);
 
-			insertNewAlerts(
-				deps.db,
-				delivery,
-				employeeId,
-				ENV.FRESHA_SERVICE_ID,
-				newStartTimes,
-			);
+			repo.insertAlerts(delivery, target, newStartTimes);
 		}
 
-		insertNewSlots(
-			deps.db,
-			employeeId,
-			ENV.FRESHA_SERVICE_ID,
-			newStartTimes,
-			seenAt,
-		);
+		repo.insertSlots(target, newStartTimes, seenAt);
 
 		return { ok: true, newSlots: newStartTimes, goneSlots: goneStartTimes };
 	};
