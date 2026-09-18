@@ -4,7 +4,7 @@ import {
 	FreshaError,
 	type FreshaModel,
 } from "@/modules/fresha";
-import { formatDay } from "@/utils/date";
+import { formatDay, formatWallClock } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
@@ -18,7 +18,7 @@ export type WatchdogDeps = {
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (text: string) => Promise<Delivery>;
 	edit: (chatId: ChatId, messageId: MessageId, text: string) => Promise<void>;
-	now?: () => Date;
+	now?: () => Temporal.Instant;
 	sleep?: Sleep;
 };
 
@@ -270,9 +270,13 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	};
 
 	const check = async (): Promise<CheckResult> => {
-		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
+		const now = (deps.now ?? Temporal.Now.instant)();
+		const seenAt = now.toString({
+			fractionalSecondDigits: 3,
+		});
+		const salonNow = formatWallClock(now, ENV.SALON_TIME_ZONE);
 
-		deleteExpiredAlerts(deps.db, seenAt);
+		deleteExpiredAlerts(deps.db, salonNow);
 
 		if (skipTicks > 0) {
 			skipTicks--;

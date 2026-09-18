@@ -114,7 +114,7 @@ describe("check", () => {
 		return Promise.resolve();
 	};
 	const sleep = () => Promise.resolve();
-	let clock: Date;
+	let clock: Temporal.Instant;
 	const now = () => clock;
 
 	const service = (fresha: {
@@ -136,7 +136,7 @@ describe("check", () => {
 		db = openDatabase(":memory:");
 		sent = [];
 		edited = [];
-		clock = new Date("2026-09-14T10:00:00Z");
+		clock = Temporal.Instant.from("2026-09-14T10:00:00Z");
 	});
 	afterEach(() => {
 		db.close();
@@ -268,7 +268,7 @@ describe("check", () => {
 		await watchdog.check();
 		expect(countAlerts()).toBe(2);
 
-		clock = new Date("2026-09-17T11:40:00Z");
+		clock = Temporal.Instant.from("2026-09-17T09:40:00Z");
 		await watchdog.check();
 
 		expect(countAlerts()).toBe(1);
