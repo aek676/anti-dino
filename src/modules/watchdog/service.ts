@@ -4,7 +4,7 @@ import {
 	FreshaError,
 	type FreshaModel,
 } from "@/modules/fresha";
-import { formatDay } from "@/utils/date";
+import { formatDay, formatWallClock } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
@@ -18,7 +18,7 @@ export type WatchdogDeps = {
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (text: string) => Promise<Delivery>;
 	edit: (chatId: ChatId, messageId: MessageId, text: string) => Promise<void>;
-	now?: () => Date;
+	now?: () => Temporal.Instant;
 	sleep?: Sleep;
 };
 
@@ -51,14 +51,12 @@ export const retry = async <T>(
 	return lastError;
 };
 
-type Slot = FreshaModel["slot"];
+const slotKey = (slot: FreshaModel["slot"]) => `${slot.date}T${slot.time}`;
 
-const slotKey = (slot: Slot) => `${slot.date}T${slot.time}`;
-
-const byDateTime = (a: Slot, b: Slot) =>
+const byDateTime = (a: FreshaModel["slot"], b: FreshaModel["slot"]) =>
 	a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
 
-const formatSlots = (slots: Slot[]): string[] =>
+const formatSlots = (slots: FreshaModel["slot"][]): string[] =>
 	Object.entries(
 		Object.groupBy(slots.toSorted(byDateTime), (slot) => slot.date),
 	).map(
@@ -66,12 +64,15 @@ const formatSlots = (slots: Slot[]): string[] =>
 			`${formatDay(date)}: ${daySlots?.map((slot) => slot.time).join(", ")}`,
 	);
 
-const formatNewSlotsMessage = (slots: Slot[], bookingUrl: string): string =>
+const formatNewSlotsMessage = (
+	slots: FreshaModel["slot"][],
+	bookingUrl: string,
+): string =>
 	[`${slots.length} new slot(s):`, ...formatSlots(slots), bookingUrl].join(
 		"\n",
 	);
 
-const toSlot = (startsAt: string): Slot => {
+const toSlot = (startsAt: string): FreshaModel["slot"] => {
 	const [date = "", time = ""] = startsAt.split("T");
 	return { date, time };
 };
@@ -270,9 +271,13 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	};
 
 	const check = async (): Promise<CheckResult> => {
-		const seenAt = (deps.now ?? (() => new Date()))().toISOString();
+		const now = (deps.now ?? Temporal.Now.instant)();
+		const seenAt = now.toString({
+			fractionalSecondDigits: 3,
+		});
+		const salonNow = formatWallClock(now, ENV.SALON_TIME_ZONE);
 
-		deleteExpiredAlerts(deps.db, seenAt);
+		deleteExpiredAlerts(deps.db, salonNow);
 
 		if (skipTicks > 0) {
 			skipTicks--;

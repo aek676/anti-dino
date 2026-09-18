@@ -114,7 +114,7 @@ describe("check", () => {
 		return Promise.resolve();
 	};
 	const sleep = () => Promise.resolve();
-	let clock: Date;
+	let clock: Temporal.Instant;
 	const now = () => clock;
 
 	const service = (fresha: {
@@ -136,7 +136,7 @@ describe("check", () => {
 		db = openDatabase(":memory:");
 		sent = [];
 		edited = [];
-		clock = new Date("2026-09-14T10:00:00Z");
+		clock = Temporal.Instant.from("2026-09-14T10:00:00Z");
 	});
 	afterEach(() => {
 		db.close();
@@ -154,7 +154,7 @@ describe("check", () => {
 		expect(sent[0]).toBe(
 			[
 				"2 new slot(s):",
-				"jue, 17 sept: 11:30, 11:45",
+				"Thu, Sep 17: 11:30, 11:45",
 				ENV.FRESHA_BOOKING_URL,
 			].join("\n"),
 		);
@@ -172,8 +172,8 @@ describe("check", () => {
 		expect(sent[0]).toBe(
 			[
 				"3 new slot(s):",
-				"jue, 17 sept: 11:30, 11:45",
-				"vie, 18 sept: 10:00",
+				"Thu, Sep 17: 11:30, 11:45",
+				"Fri, Sep 18: 10:00",
 				ENV.FRESHA_BOOKING_URL,
 			].join("\n"),
 		);
@@ -201,7 +201,7 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(2);
-		expect(sent[1]).toContain("vie, 18 sept: 10:00");
+		expect(sent[1]).toContain("Fri, Sep 18: 10:00");
 		expect(sent[1]).not.toContain("11:30");
 		expect(countSlots()).toBe(3);
 	});
@@ -222,7 +222,7 @@ describe("check", () => {
 		expect(edited[0]?.text).toBe(
 			[
 				"1 of 2 slot(s) still available:",
-				"jue, 17 sept: 11:45",
+				"Thu, Sep 17: 11:45",
 				ENV.FRESHA_BOOKING_URL,
 			].join("\n"),
 		);
@@ -268,7 +268,7 @@ describe("check", () => {
 		await watchdog.check();
 		expect(countAlerts()).toBe(2);
 
-		clock = new Date("2026-09-17T11:40:00Z");
+		clock = Temporal.Instant.from("2026-09-17T09:40:00Z");
 		await watchdog.check();
 
 		expect(countAlerts()).toBe(1);
@@ -326,7 +326,7 @@ describe("check", () => {
 		expect(sent[1]).toBe(
 			`Fresha OK again after ${threshold + 1} failed checks`,
 		);
-		expect(sent[2]).toContain("jue, 17 sept: 11:30");
+		expect(sent[2]).toContain("Thu, Sep 17: 11:30");
 	});
 
 	test("a short failure streak recovers without any message", async () => {
