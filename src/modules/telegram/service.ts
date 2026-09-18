@@ -14,7 +14,10 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		const query = deps.db.query<void, { chatId: number; createdAt: string }>(
 			`INSERT OR IGNORE INTO subscribers (chat_id, created_at) VALUES (:chatId, :createdAt)`,
 		);
-		query.run({ chatId, createdAt: new Date().toISOString() });
+		query.run({
+			chatId,
+			createdAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
+		});
 	};
 
 	const unsubscribe = (chatId: number) => {
