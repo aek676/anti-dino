@@ -10,23 +10,24 @@
 Env vars are declared in `.env.schema`. Secrets live in
 [Bitwarden Secrets Manager](https://bitwarden.com/products/secrets-manager/) and
 are referenced from the schema by id, so the only secret you hold locally is a
-machine account access token. Shared development defaults are committed in
-`.env.development`; create a gitignored `.env.local` with the values that are
-yours alone:
+machine account access token. Shared defaults are committed per environment in
+`.env.development` and `.env.production`, each pointing at its own Telegram bot.
+The schema has no bot on purpose, so a missing environment file fails validation
+instead of silently using production. The values that are yours alone go in a
+gitignored `.env.local`, created from its template:
 
 ```bash
-cat > .env.local <<'EOT'
-BITWARDEN_ACCESS_TOKEN=<machine account token>
-PUBLIC_URL=<public URL of your tunnel>
-ADMIN_CHAT_ID=<your Telegram chat id>
-EOT
-```
-
-```bash
+cp .env.local.example .env.local   # fill in your tunnel URL and Telegram chat id
 bun install
-bunx varlock load   # validates .env.local against the schema, masks secrets
+bunx varlock load   # asks for the Bitwarden token once, then validates and masks secrets
 bun run dev
 ```
+
+The token never sits on disk in plaintext: Varlock swaps the `varlock(prompt)`
+placeholder in `.env.local` for a `varlock(local:...)` value encrypted for your
+machine, so it is useless anywhere else and unreadable to tools that open the
+file. If you already have a plaintext `.env.local`, run
+`bunx varlock encrypt --file .env.local` instead.
 
 Tests never touch Bitwarden: `.env.test` overrides the secrets with placeholders
 and the access token is optional there.
@@ -60,11 +61,16 @@ docker compose logs -f
 docker compose stop
 ```
 
-The first command fails if anything is missing or invalid, so a bad config never
-reaches the container. Re-run it after changing `.env.schema` or any `.env`
-value: the running container keeps the blob it started with. If the plaintext
-blob should not sit in the environment, Varlock also accepts an encrypted blob
-(`varlock:v1:...`) plus `_VARLOCK_ENV_KEY`.
+Everything production needs is committed in `.env.production`, so the only thing
+the host supplies is the production `BITWARDEN_ACCESS_TOKEN`: either exported in
+the environment, or in a `.env.local` holding that single line (the first load
+then has to run in an interactive terminal so it can ask for the token). Keep
+`PUBLIC_URL` and `ADMIN_CHAT_ID` out of that file, since `.env.local` overrides
+`.env.production`. The first command fails if anything is missing or invalid, so
+a bad config never reaches the container. Re-run it after changing `.env.schema`
+or any `.env` value: the running container keeps the blob it started with. If
+the plaintext blob should not sit in the environment, Varlock also accepts an
+encrypted blob (`varlock:v1:...`) plus `_VARLOCK_ENV_KEY`.
 
 The build cross-compiles for the target architecture, so a multi-arch image
 (x86_64 and ARM64) can be produced from any host without emulation:
