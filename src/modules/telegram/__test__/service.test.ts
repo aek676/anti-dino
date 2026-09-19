@@ -7,19 +7,16 @@ import {
 	spyOn,
 	test,
 } from "bun:test";
-import { type Bot, type Context, GrammyError } from "grammy";
+import { type Bot, GrammyError } from "grammy";
 import { type Db, openDatabase } from "@/utils/db";
 import { log } from "@/utils/logger";
 import type { Message } from "../model";
 import { createTelegramService } from "../service";
 
-type Command = (ctx: Context) => unknown;
 type Options = {
 	parse_mode?: string;
 	link_preview_options?: { is_disabled: boolean };
-	reply_markup?: {
-		inline_keyboard: { text: string; url?: string; callback_data?: string }[][];
-	};
+	reply_markup?: { inline_keyboard: { text: string; url?: string }[][] };
 };
 
 const hello: Message = { text: "hello" };
@@ -32,8 +29,6 @@ const fakeBot = (failFor: Set<number> = new Set(), editError?: unknown) => {
 		text: string;
 		options?: Options;
 	}[] = [];
-	const commands = new Map<string, Command>();
-	const callbacks = new Map<string, Command>();
 	let messageId = 0;
 	const bot = {
 		api: {
@@ -54,37 +49,8 @@ const fakeBot = (failFor: Set<number> = new Set(), editError?: unknown) => {
 				return Promise.resolve(true);
 			},
 		},
-		command: (name: string, handler: Command) => {
-			commands.set(name, handler);
-		},
-		callbackQuery: (data: string, handler: Command) => {
-			callbacks.set(data, handler);
-		},
 	} as unknown as Bot;
-	return { bot, sent, edited, commands, callbacks };
-};
-
-const fakeCtx = (chatId: number) => {
-	const replies: string[] = [];
-	const keyboards: Options["reply_markup"][] = [];
-	const events: string[] = [];
-	const ctx = {
-		chatId,
-		reply: (text: string, options?: Options) => {
-			replies.push(text);
-			keyboards.push(options?.reply_markup);
-			return Promise.resolve();
-		},
-		answerCallbackQuery: () => {
-			events.push("answered");
-			return Promise.resolve(true);
-		},
-		editMessageReplyMarkup: () => {
-			events.push("button removed");
-			return Promise.resolve(true);
-		},
-	} as unknown as Context;
-	return { ctx, replies, keyboards, events };
+	return { bot, sent, edited };
 };
 
 const ADMIN = 1;
@@ -92,14 +58,8 @@ const ADMIN = 1;
 describe("telegram service", () => {
 	let db: Db;
 	let warn: Mock<typeof log.warn>;
-	let slotsSentTo: number[];
-	const sendSlots = (chatId: number) => {
-		slotsSentTo.push(chatId);
-		return Promise.resolve();
-	};
 
 	beforeEach(() => {
-		slotsSentTo = [];
 		db = openDatabase(":memory:");
 		warn = spyOn(log, "warn");
 	});
@@ -110,12 +70,7 @@ describe("telegram service", () => {
 
 	test("subscribe stores the chat once", () => {
 		const { bot } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		service.subscribe(10);
 		service.subscribe(10);
@@ -126,12 +81,7 @@ describe("telegram service", () => {
 
 	test("unsubscribe removes the chat", () => {
 		const { bot } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		service.subscribe(10);
 		service.unsubscribe(10);
@@ -141,12 +91,7 @@ describe("telegram service", () => {
 
 	test("notify reaches every subscriber and the admin exactly once", async () => {
 		const { bot, sent } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 		service.subscribe(10);
 		service.subscribe(ADMIN);
 
@@ -158,12 +103,7 @@ describe("telegram service", () => {
 
 	test("notify only alerts the admin when nobody subscribed", async () => {
 		const { bot, sent } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		await service.notify(hello);
 
@@ -172,12 +112,7 @@ describe("telegram service", () => {
 
 	test("notify keeps going when one chat rejects the message", async () => {
 		const { bot, sent } = fakeBot(new Set([10]));
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 		service.subscribe(10);
 		service.subscribe(20);
 
@@ -188,12 +123,7 @@ describe("telegram service", () => {
 
 	test("notify throws when nobody could be reached", () => {
 		const { bot } = fakeBot(new Set([ADMIN, 10]));
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 		service.subscribe(10);
 
 		expect(service.notify(hello)).rejects.toThrow(/Delivered: 0, Total: 2/);
@@ -201,12 +131,7 @@ describe("telegram service", () => {
 
 	test("notify sends HTML with the buttons as an inline URL keyboard", async () => {
 		const { bot, sent } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		await service.notify({
 			text: "<b>hello</b>",
@@ -223,12 +148,7 @@ describe("telegram service", () => {
 	});
 	test("notifyAdmin writes to the admin only", async () => {
 		const { bot, sent } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 		service.subscribe(10);
 		await service.notifyAdmin(hello);
 
@@ -237,12 +157,7 @@ describe("telegram service", () => {
 
 	test("notifyAdmin logs and swallows a failed send", async () => {
 		const { bot } = fakeBot(new Set([ADMIN]));
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		await service.notifyAdmin(hello);
 
@@ -251,12 +166,7 @@ describe("telegram service", () => {
 
 	test("edit rewrites the message text", async () => {
 		const { bot, edited } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		await service.edit(10, 5, { text: "new text" });
 
@@ -267,12 +177,7 @@ describe("telegram service", () => {
 
 	test("edit without buttons clears the keyboard", async () => {
 		const { bot, edited } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		await service.edit(10, 5, { text: "new text" });
 
@@ -292,12 +197,7 @@ describe("telegram service", () => {
 			{},
 		);
 		const { bot } = fakeBot(new Set(), notModified);
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		await service.edit(10, 5, { text: "same text" });
 
@@ -306,12 +206,7 @@ describe("telegram service", () => {
 
 	test("edit logs and swallows any other failure", async () => {
 		const { bot } = fakeBot(new Set(), new Error("message can't be edited"));
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		await service.edit(10, 5, { text: "new text" });
 
@@ -320,12 +215,7 @@ describe("telegram service", () => {
 
 	test("send returns the id of the message it sent", async () => {
 		const { bot, sent } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		const messageId = await service.send(10, hello);
 
@@ -335,12 +225,7 @@ describe("telegram service", () => {
 
 	test("send logs and swallows a failed send", async () => {
 		const { bot } = fakeBot(new Set([10]));
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 
 		const messageId = await service.send(10, hello);
 
@@ -348,87 +233,12 @@ describe("telegram service", () => {
 		expect(warn).toHaveBeenCalledTimes(1);
 	});
 
-	test("/start welcomes a new chat with the commands and a start button", async () => {
-		const { bot, commands } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
-		const { ctx, replies, keyboards } = fakeCtx(10);
-
-		await commands.get("start")?.(ctx);
-
-		expect(service.listSubscribers()).toEqual([]);
-		expect(slotsSentTo).toEqual([]);
-		expect(replies).toHaveLength(1);
-		for (const command of ["/start", "/slots", "/stop"])
-			expect(replies[0]).toContain(command);
-		expect(keyboards[0]?.inline_keyboard).toEqual([
-			[{ text: "🚀 Start", callback_data: "subscribe" }],
-		]);
-	});
-
-	test("the start button subscribes the chat and sends the current slots", async () => {
-		const { bot, callbacks } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
-		const { ctx, replies, events } = fakeCtx(10);
-
-		await callbacks.get("subscribe")?.(ctx);
-
-		expect(service.listSubscribers()).toEqual([10]);
-		expect(events).toEqual(["answered", "button removed"]);
-		expect(replies).toEqual(["You have subscribed to notifications."]);
-		expect(slotsSentTo).toEqual([10]);
-	});
-
-	test("/start sends the current slots to a chat that already subscribed", async () => {
-		const { bot, commands } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
+	test("isSubscribed tells a subscribed chat from a new one", () => {
+		const { bot } = fakeBot();
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
 		service.subscribe(10);
-		const { ctx, replies } = fakeCtx(10);
 
-		await commands.get("start")?.(ctx);
-
-		expect(replies).toEqual([]);
-		expect(slotsSentTo).toEqual([10]);
-	});
-
-	test("/slots sends the current slots", async () => {
-		const { bot, commands } = fakeBot();
-		createTelegramService({ db, bot, adminChatId: ADMIN, sendSlots });
-		const { ctx } = fakeCtx(10);
-
-		await commands.get("slots")?.(ctx);
-
-		expect(slotsSentTo).toEqual([10]);
-	});
-
-	test("/stop unsubscribes the chat and confirms", async () => {
-		const { bot, commands } = fakeBot();
-		const service = createTelegramService({
-			db,
-			bot,
-			adminChatId: ADMIN,
-			sendSlots,
-		});
-		service.subscribe(10);
-		const { ctx, replies } = fakeCtx(10);
-
-		await commands.get("stop")?.(ctx);
-
-		expect(service.listSubscribers()).toEqual([]);
-		expect(replies).toEqual(["You have unsubscribed from notifications."]);
+		expect(service.isSubscribed(10)).toBe(true);
+		expect(service.isSubscribed(20)).toBe(false);
 	});
 });

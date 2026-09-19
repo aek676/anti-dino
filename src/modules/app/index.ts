@@ -3,8 +3,13 @@ import { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
-import { createTelegramService, telegram } from "@/modules/telegram";
-import { createWatchdogService, watchdog } from "@/modules/watchdog";
+import { createSlotsService } from "@/modules/slots";
+import {
+	createTelegramService,
+	registerCommands,
+	telegram,
+} from "@/modules/telegram";
+import { watchdog } from "@/modules/watchdog";
 import { closeDatabase, db } from "@/utils/db";
 import { log } from "@/utils/logger";
 
@@ -14,18 +19,15 @@ const telegramService = createTelegramService({
 	db,
 	bot,
 	adminChatId: ENV.ADMIN_CHAT_ID,
-	sendSlots: (chatId) => watchdogService.sendSlots(chatId),
 });
 
-const watchdogService = createWatchdogService({
-	db,
-	fresha: createFreshaService(fetch, {
-		stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
-	}),
-	send: telegramService.send,
-	notify: telegramService.notify,
-	notifyAdmin: telegramService.notifyAdmin,
-	edit: telegramService.edit,
+const slotsService = createSlotsService({ db, send: telegramService.send });
+
+registerCommands(bot, {
+	subscribe: telegramService.subscribe,
+	unsubscribe: telegramService.unsubscribe,
+	isSubscribed: telegramService.isSubscribed,
+	sendSlots: slotsService.sendCurrent,
 });
 
 const app = new Elysia()
@@ -37,7 +39,17 @@ const app = new Elysia()
 	.use(health(db))
 	.decorate("db", db)
 	.use(fresha())
-	.use(watchdog(watchdogService))
+	.use(
+		watchdog({
+			db,
+			fresha: createFreshaService(fetch, {
+				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
+			}),
+			notify: telegramService.notify,
+			notifyAdmin: telegramService.notifyAdmin,
+			edit: telegramService.edit,
+		}),
+	)
 	.use(telegram(bot))
 	.onStop(({ store }) => {
 		store.cron.watchdog.stop();

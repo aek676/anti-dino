@@ -7,20 +7,7 @@ export type TelegramDeps = {
 	db: Db;
 	adminChatId: number;
 	bot: Bot;
-	sendSlots: (chatId: ChatId) => Promise<void>;
 };
-
-const SUBSCRIBE_ACTION = "subscribe";
-
-const WELCOME = [
-	"<b>👋 Hi! I watch the salon's calendar and message you when a slot opens up.</b>",
-	[
-		"/start - subscribe to the alerts",
-		"/slots - see the slots available right now",
-		"/stop - unsubscribe",
-	].join("\n"),
-	"Press the button to start.",
-].join("\n\n");
 
 const toOptions = ({ buttons = [] }: Message) => ({
 	parse_mode: "HTML" as const,
@@ -125,32 +112,6 @@ export const createTelegramService = (deps: TelegramDeps) => {
 	const notifyAdmin = async (message: Message) => {
 		await send(deps.adminChatId, message);
 	};
-
-	deps.bot.command("start", (ctx) => {
-		if (isSubscribed(ctx.chatId)) return deps.sendSlots(ctx.chatId);
-
-		return ctx.reply(WELCOME, {
-			parse_mode: "HTML",
-			reply_markup: new InlineKeyboard().text("🚀 Start", SUBSCRIBE_ACTION),
-		});
-	});
-
-	deps.bot.callbackQuery(SUBSCRIBE_ACTION, async (ctx) => {
-		await ctx.answerCallbackQuery();
-		if (ctx.chatId === undefined) return;
-
-		subscribe(ctx.chatId);
-		await ctx.editMessageReplyMarkup();
-		await ctx.reply("You have subscribed to notifications.");
-		await deps.sendSlots(ctx.chatId);
-	});
-
-	deps.bot.command("slots", (ctx) => deps.sendSlots(ctx.chatId));
-
-	deps.bot.command("stop", (ctx) => {
-		unsubscribe(ctx.chatId);
-		return ctx.reply("You have unsubscribed from notifications.");
-	});
 
 	return {
 		subscribe,

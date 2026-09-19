@@ -2,6 +2,9 @@ import { Elysia, status, t } from "elysia";
 import type { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { log } from "@/utils/logger";
+import { COMMANDS } from "./commands";
+
+export { registerCommands } from "./commands";
 
 export type {
 	ChatId,
@@ -18,14 +21,7 @@ export const telegram = (bot: Bot) => {
 		.onStart(async () => {
 			try {
 				await bot.init();
-				await bot.api.setMyCommands([
-					{ command: "start", description: "Subscribe to the alerts" },
-					{
-						command: "slots",
-						description: "See the slots available right now",
-					},
-					{ command: "stop", description: "Unsubscribe" },
-				]);
+				await bot.api.setMyCommands(COMMANDS);
 				await bot.api.setWebhook(ENV.PUBLIC_URL + ENV.WEBHOOK_PATH, {
 					secret_token: ENV.TELEGRAM_WEBHOOK_SECRET,
 				});
