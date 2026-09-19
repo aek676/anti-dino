@@ -58,6 +58,7 @@ type TimeScreen = {
 	dates: {
 		date: { iso: string };
 		isAvailableToBeBooked: boolean;
+		isLoading?: boolean;
 		action: { id: string } | null;
 	}[];
 	day: {
@@ -314,31 +315,43 @@ export const createFreshaService = (
 		const time = await press(continueAction.id, cart.cartId);
 		if (time instanceof FreshaError) return time;
 
-		const dates = time.screenTime.dates;
+		let { dates, day } = time.screenTime;
 		if (!dates) return new FreshaError("time screen has no reached", "graphql");
 
+		// Fresha only computes availability for about three weeks around the open
+		// day. Further out, isAvailableToBeBooked is a placeholder until isLoading
+		// turns false, and opening any of those days computes the ones around it.
 		const slots: FreshaModel["slot"][] = [];
+		const read = new Set<string>();
 		let opened = 0;
-		for (const entry of dates.slice(0, daysAhead)) {
-			if (!entry.isAvailableToBeBooked) continue;
-			const date = entry.date.iso.slice(0, 10);
+		const nextDay = () => {
+			const pending = (dates ?? [])
+				.slice(0, daysAhead)
+				.filter(
+					(entry) => entry.isAvailableToBeBooked && !read.has(entry.date.iso),
+				);
+			return pending.find((entry) => !entry.isLoading) ?? pending[0];
+		};
 
-			if (!entry.action) {
-				const day = time.screenTime.day;
-				if (!day) return new FreshaError(`day ${date} not reached`, "graphql");
-				slots.push(...parseSlots(date, day));
-				continue;
+		for (let entry = nextDay(); entry; entry = nextDay()) {
+			const date = entry.date.iso.slice(0, 10);
+			read.add(entry.date.iso);
+
+			if (entry.action) {
+				if (opened++ > 0 && stepDelayMs > 0) await sleep(stepDelayMs);
+				const pressed = await press(entry.action.id, cart.cartId);
+				if (pressed instanceof FreshaError) return pressed;
+
+				day = pressed.screenTime.day;
+				dates = pressed.screenTime.dates ?? dates;
 			}
 
-			if (opened++ > 0 && stepDelayMs > 0) await sleep(stepDelayMs);
-			const pressed = await press(entry.action.id, cart.cartId);
-			if (pressed instanceof FreshaError) return pressed;
-
-			const day = pressed.screenTime.day;
 			if (!day) return new FreshaError(`day ${date} not reached`, "graphql");
 			slots.push(...parseSlots(date, day));
 		}
-		return slots;
+		return slots.toSorted(
+			(a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
+		);
 	};
 
 	return { listServices, listEmployees, listSlots };
