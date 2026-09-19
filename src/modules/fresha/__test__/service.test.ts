@@ -279,7 +279,7 @@ describe("listSlots", () => {
 		return { fetchFn, pressed };
 	};
 
-	test("selects the employee and opens only the available days", async () => {
+	test("selects the employee and opens the days that may have slots", async () => {
 		const { fetchFn, pressed } = router();
 
 		const result = await createFreshaService(fetchFn).listSlots(
@@ -294,13 +294,49 @@ describe("listSlots", () => {
 			"onScreenServicesContinue",
 			"onScreenEmployeeSet",
 			"onScreenEmployeeContinue",
-			...Array<string>(24).fill("onScreenTimeDaySelectorDateSet"),
+			...Array<string>(21).fill("onScreenTimeDaySelectorDateSet"),
 		]);
 		expect(pressed[2]).toMatchObject({ employeeId: 3182031 });
 		expect(pressed[4]).toMatchObject({ date: "2026-09-08" });
 
-		expect(result).toHaveLength(24 * 14);
+		expect(result).toHaveLength(21 * 14);
 		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
+	});
+
+	test("stops opening loading days once one of them resolves the rest", async () => {
+		const resolved = structuredClone(day);
+		const screenTime = resolved.data.bookingFlowActionButtonPressed.screenTime;
+		Object.assign(screenTime, {
+			dates: screenTime.dates.map((entry) =>
+				entry.isLoading
+					? {
+							...entry,
+							isLoading: false,
+							isAvailableToBeBooked: entry.date.iso.startsWith("2026-09-24"),
+						}
+					: entry,
+			),
+		});
+		const { fetchFn, pressed } = router();
+		const resolving: FetchFn = (url, init) =>
+			(init.body as string).includes('\\"date\\":\\"2026-09-24\\"')
+				? Promise.resolve(Response.json(resolved))
+				: fetchFn(url, init);
+
+		const result = await createFreshaService(resolving).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			31,
+		);
+
+		const opened = pressed
+			.filter((a) => a.type === "onScreenTimeDaySelectorDateSet")
+			.map((a) => a.date);
+		expect(opened).toHaveLength(9);
+		expect(opened).not.toContain("2026-09-25");
+		expect(result).toHaveLength(10 * 14);
+		expect(result).toContainEqual({ date: "2026-09-24", time: "12:15" });
 	});
 
 	test("reads the preselected day from the time screen instead of pressing it", async () => {
