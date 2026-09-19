@@ -3,7 +3,14 @@ import type { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { log } from "@/utils/logger";
 
-export type { ChatId, Delivery, MessageId } from "./model";
+export type {
+	ChatId,
+	Delivery,
+	LinkButton,
+	Message,
+	MessageId,
+} from "./model";
+export { escapeHtml } from "./model";
 export { createTelegramService } from "./service";
 
 export const telegram = (bot: Bot) => {
