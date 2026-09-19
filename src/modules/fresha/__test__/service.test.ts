@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import { log } from "@/utils/logger";
 import { FreshaError } from "../model";
 import {
 	createFreshaService,
@@ -337,6 +338,38 @@ describe("listSlots", () => {
 		expect(opened).not.toContain("2026-09-25");
 		expect(result).toHaveLength(10 * 14);
 		expect(result).toContainEqual({ date: "2026-09-24", time: "12:15" });
+	});
+
+	test("hands back the Retry-After of a 429 that hits halfway through the days", async () => {
+		const warn = spyOn(log, "warn");
+		const { fetchFn } = router();
+		const limited: FetchFn = (url, init) =>
+			(init.body as string).includes('\\"date\\":\\"2026-09-10\\"')
+				? Promise.resolve(
+						Response.json(
+							{},
+							{ status: 429, headers: { "retry-after": "711" } },
+						),
+					)
+				: fetchFn(url, init);
+
+		const result = await createFreshaService(limited).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			31,
+		);
+
+		expect(result).toMatchObject({ status: 429, retryAfterSeconds: 711 });
+		expect(warn).toHaveBeenCalledWith(
+			{
+				operation: "BookingFlow_ActionButtonPressed_Mutation",
+				action: "onScreenTimeDaySelectorDateSet",
+				retryAfterSeconds: 711,
+			},
+			"fresha rate limited",
+		);
+		warn.mockRestore();
 	});
 
 	test("reads the preselected day from the time screen instead of pressing it", async () => {

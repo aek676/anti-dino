@@ -1,3 +1,4 @@
+import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 import { FreshaError, type FreshaModel } from "./model";
 
@@ -144,6 +145,8 @@ export const parseSlots = (
 		? (day.timeslots ?? []).map((slot) => ({ date, time: slot.time }))
 		: [];
 
+const TOO_MANY_REQUESTS = 429;
+
 const parseRetryAfter = (res: Response): number | undefined => {
 	const seconds = Number(res.headers.get("retry-after"));
 	return Number.isInteger(seconds) && seconds > 0 ? seconds : undefined;
@@ -163,6 +166,11 @@ export const createFreshaService = (
 		variables: Record<string, unknown>,
 	): Promise<T | FreshaError> => {
 		const { name, hash } = OPERATIONS[operation];
+		const action =
+			typeof variables.id === "string"
+				? parseActionId(variables.id).type
+				: undefined;
+		const startedAt = performance.now();
 		const res = await fetchFn(ENDPOINT, {
 			method: "POST",
 			headers: {
@@ -181,12 +189,29 @@ export const createFreshaService = (
 			}),
 		});
 
+		log.debug(
+			{
+				operation: name,
+				action,
+				status: res.status,
+				durationMs: Math.round(performance.now() - startedAt),
+			},
+			"fresha call",
+		);
+
 		if (!res.ok) {
+			const retryAfterSeconds = parseRetryAfter(res);
+			if (res.status === TOO_MANY_REQUESTS) {
+				log.warn(
+					{ operation: name, action, retryAfterSeconds },
+					"fresha rate limited",
+				);
+			}
 			return new FreshaError(
 				`${name}: HTTP ${res.status}`,
 				"http",
 				res.status,
-				parseRetryAfter(res),
+				retryAfterSeconds,
 			);
 		}
 
