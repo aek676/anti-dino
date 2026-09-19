@@ -20,36 +20,42 @@ const toOptions = ({ buttons = [] }: Message) => ({
 });
 
 export const createTelegramService = (deps: TelegramDeps) => {
+	const insertSubscriber = deps.db.query<
+		void,
+		{ chatId: number; createdAt: string }
+	>(
+		`INSERT OR IGNORE INTO subscribers (chat_id, created_at) VALUES (:chatId, :createdAt)`,
+	);
+
+	const deleteSubscriber = deps.db.query<void, { chatId: number }>(
+		`DELETE FROM subscribers WHERE chat_id = :chatId`,
+	);
+
+	const selectSubscriber = deps.db.query<
+		{ chat_id: number },
+		{ chatId: number }
+	>(`SELECT chat_id FROM subscribers WHERE chat_id = :chatId`);
+
+	const selectSubscribers = deps.db.query<{ chat_id: number }, []>(
+		`SELECT chat_id FROM subscribers`,
+	);
+
 	const subscribe = (chatId: number) => {
-		const query = deps.db.query<void, { chatId: number; createdAt: string }>(
-			`INSERT OR IGNORE INTO subscribers (chat_id, created_at) VALUES (:chatId, :createdAt)`,
-		);
-		query.run({
+		insertSubscriber.run({
 			chatId,
 			createdAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
 		});
 	};
 
 	const unsubscribe = (chatId: number) => {
-		const query = deps.db.query<void, { chatId: number }>(
-			`DELETE FROM subscribers WHERE chat_id = :chatId`,
-		);
-		query.run({ chatId });
+		deleteSubscriber.run({ chatId });
 	};
 
-	const isSubscribed = (chatId: number) => {
-		const query = deps.db.query<{ chat_id: number }, { chatId: number }>(
-			`SELECT chat_id FROM subscribers WHERE chat_id = :chatId`,
-		);
-		return query.get({ chatId }) !== null;
-	};
+	const isSubscribed = (chatId: number) =>
+		selectSubscriber.get({ chatId }) !== null;
 
-	const listSubscribers = () => {
-		const query = deps.db.query<{ chat_id: number }, []>(
-			`SELECT chat_id FROM subscribers`,
-		);
-		return query.all().map((row) => row.chat_id);
-	};
+	const listSubscribers = () =>
+		selectSubscribers.all().map((row) => row.chat_id);
 
 	const edit = async (
 		chatId: ChatId,
