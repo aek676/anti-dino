@@ -97,6 +97,18 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		return delivered;
 	};
 
+	const notifyAdmin = async (message: Message) => {
+		try {
+			await deps.bot.api.sendMessage(
+				deps.adminChatId,
+				message.text,
+				toOptions(message),
+			);
+		} catch (error) {
+			log.warn({ err: error }, "Failed to send message to the admin");
+		}
+	};
+
 	deps.bot.command("start", (ctx) => {
 		subscribe(ctx.chatId);
 		return ctx.reply("You have subscribed to notifications.");
@@ -107,5 +119,5 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		return ctx.reply("You have unsubscribed from notifications.");
 	});
 
-	return { subscribe, unsubscribe, listSubscribers, notify, edit };
+	return { subscribe, unsubscribe, listSubscribers, notify, notifyAdmin, edit };
 };

@@ -163,6 +163,23 @@ describe("telegram service", () => {
 			[{ text: "Book", url: "https://example.com/book" }],
 		]);
 	});
+	test("notifyAdmin writes to the admin only", async () => {
+		const { bot, sent } = fakeBot();
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
+		service.subscribe(10);
+		await service.notifyAdmin(hello);
+
+		expect(sent.map((m) => [m.chatId, m.text])).toEqual([[ADMIN, "hello"]]);
+	});
+
+	test("notifyAdmin logs and swallows a failed send", async () => {
+		const { bot } = fakeBot(new Set([ADMIN]));
+		const service = createTelegramService({ db, bot, adminChatId: ADMIN });
+
+		await service.notifyAdmin(hello);
+
+		expect(warn).toHaveBeenCalledTimes(1);
+	});
 
 	test("edit rewrites the message text", async () => {
 		const { bot, edited } = fakeBot();

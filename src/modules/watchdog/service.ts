@@ -21,6 +21,7 @@ export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (message: Message) => Promise<Delivery>;
+	notifyAdmin: (message: Message) => Promise<void>;
 	edit: (
 		chatId: ChatId,
 		messageId: MessageId,
@@ -136,6 +137,19 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	let failures = 0;
 	let skipTicks = 0;
 	let skipUntil: Temporal.Instant | null = null;
+	let rateLimitAnnounced = false;
+
+	const announceRateLimit = async () => {
+		if (rateLimitAnnounced) return;
+		rateLimitAnnounced = true;
+
+		const pause = skipUntil
+			? `until ${formatWallClock(skipUntil, ENV.SALON_TIME_ZONE).slice(11)}`
+			: `for ${skipTicks} ${skipTicks === 1 ? "check" : "checks"}`;
+		await deps.notifyAdmin({
+			text: `⏸ Fresha rate limited. Checks paused ${pause}`,
+		});
+	};
 
 	const fail = async (error: FreshaError, now: Temporal.Instant) => {
 		failures++;
@@ -145,6 +159,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			} else {
 				skipTicks = Math.min(failures, MAX_SKIPPED_TICKS);
 			}
+			await announceRateLimit();
 		}
 		log.warn(
 			{
@@ -167,6 +182,12 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	};
 
 	const recover = async () => {
+		if (rateLimitAnnounced) {
+			rateLimitAnnounced = false;
+			await deps.notifyAdmin({
+				text: "▶️ Fresha rate limit lifted, checks resumed",
+			});
+		}
 		if (failures >= ENV.FAILURE_ALERT_THRESHOLD) {
 			await deps.notify({
 				text: `Fresha OK again after ${failures} failed checks`,
