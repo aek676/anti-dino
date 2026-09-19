@@ -27,13 +27,19 @@ const fake = (slots: Slot[]) => {
 	};
 };
 
-const failing = (message = "boom", status?: number) => {
+const failing = (
+	message = "boom",
+	status?: number,
+	retryAfterSeconds?: number,
+) => {
 	let calls = 0;
 	let slots: Slot[] | undefined;
 	return {
 		listSlots: (): Promise<Slot[] | FreshaError> => {
 			calls++;
-			return Promise.resolve(slots ?? new FreshaError(message, "http", status));
+			return Promise.resolve(
+				slots ?? new FreshaError(message, "http", status, retryAfterSeconds),
+			);
 		},
 		recover: (next: Slot[]) => {
 			slots = next;
@@ -113,6 +119,11 @@ describe("check", () => {
 		sent.push(message);
 		return Promise.resolve(new Map([[chatId, sent.length]]));
 	};
+	let sentToAdmin: string[];
+	const notifyAdmin = (message: Message) => {
+		sentToAdmin.push(message.text);
+		return Promise.resolve();
+	};
 	const edit = (chatId: number, messageId: number, message: Message) => {
 		edited.push({ chatId, messageId, message });
 		return Promise.resolve();
@@ -123,7 +134,16 @@ describe("check", () => {
 
 	const service = (fresha: {
 		listSlots: () => Promise<Slot[] | FreshaError>;
-	}) => createWatchdogService({ db, fresha, notify, edit, now, sleep });
+	}) =>
+		createWatchdogService({
+			db,
+			fresha,
+			notify,
+			notifyAdmin,
+			edit,
+			now,
+			sleep,
+		});
 
 	const countSlots = () =>
 		db
@@ -139,6 +159,7 @@ describe("check", () => {
 	beforeEach(() => {
 		db = openDatabase(":memory:");
 		sent = [];
+		sentToAdmin = [];
 		edited = [];
 		clock = Temporal.Instant.from("2026-09-14T10:00:00Z");
 	});
@@ -377,6 +398,70 @@ describe("check", () => {
 		expect(sent).toHaveLength(1);
 	});
 
+	test("waits out the Retry-After of a 429 instead of guessing", async () => {
+		const fresha = failing("HTTP 429", 429, 711);
+		const watchdog = service(fresha);
+
+		expect(await watchdog.check()).toEqual({ ok: false });
+
+		clock = clock.add({ seconds: 710 });
+		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
+		expect(fresha.calls).toBe(1);
+
+		fresha.recover([slotA]);
+		clock = clock.add({ seconds: 1 });
+		expect(await watchdog.check()).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30"],
+			goneSlots: [],
+		});
+		expect(fresha.calls).toBe(2);
+	});
+
+	test("tells the admin once when the rate limit starts and again when it lifts", async () => {
+		const fresha = failing("HTTP 429", 429, 711);
+		const watchdog = service(fresha);
+
+		await watchdog.check();
+		expect(sentToAdmin).toEqual([
+			"⏸ Fresha rate limited. Checks paused until 12:11",
+		]);
+
+		clock = clock.add({ seconds: 300 });
+		await watchdog.check();
+		clock = clock.add({ seconds: 411 });
+		await watchdog.check();
+		expect(sentToAdmin).toHaveLength(1);
+
+		fresha.recover([]);
+		clock = clock.add({ seconds: 711 });
+		await watchdog.check();
+		expect(sentToAdmin).toEqual([
+			"⏸ Fresha rate limited. Checks paused until 12:11",
+			"▶️ Fresha rate limit lifted, checks resumed",
+		]);
+		expect(sent).toEqual([]);
+	});
+
+	test("announces the pause in checks when the 429 has no Retry-After", async () => {
+		await service(failing("HTTP 429", 429)).check();
+
+		expect(sentToAdmin).toEqual([
+			"⏸ Fresha rate limited. Checks paused for 1 check",
+		]);
+	});
+
+	test("keeps the admin out of it when the failure is not a rate limit", async () => {
+		const fresha = failing("HTTP 503");
+		const watchdog = service(fresha);
+
+		await watchdog.check();
+		fresha.recover([]);
+		await watchdog.check();
+
+		expect(sentToAdmin).toEqual([]);
+	});
+
 	test("never skips more than six ticks in a row", async () => {
 		const fresha = failing("HTTP 429", 429);
 		const watchdog = service(fresha);
@@ -404,6 +489,7 @@ describe("check", () => {
 			now,
 			sleep,
 			edit,
+			notifyAdmin,
 			notify: () => Promise.reject(new Error("telegram down")),
 		});
 

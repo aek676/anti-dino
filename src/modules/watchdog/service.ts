@@ -21,6 +21,7 @@ export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (message: Message) => Promise<Delivery>;
+	notifyAdmin: (message: Message) => Promise<void>;
 	edit: (
 		chatId: ChatId,
 		messageId: MessageId,
@@ -135,14 +136,38 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	const repo = createWatchdogRepository(deps.db);
 	let failures = 0;
 	let skipTicks = 0;
+	let skipUntil: Temporal.Instant | null = null;
+	let rateLimitAnnounced = false;
 
-	const fail = async (error: FreshaError) => {
+	const announceRateLimit = async () => {
+		if (rateLimitAnnounced) return;
+		rateLimitAnnounced = true;
+
+		const pause = skipUntil
+			? `until ${formatWallClock(skipUntil, ENV.SALON_TIME_ZONE).slice(11)}`
+			: `for ${skipTicks} ${skipTicks === 1 ? "check" : "checks"}`;
+		await deps.notifyAdmin({
+			text: `⏸ Fresha rate limited. Checks paused ${pause}`,
+		});
+	};
+
+	const fail = async (error: FreshaError, now: Temporal.Instant) => {
 		failures++;
 		if (isRateLimited(error)) {
-			skipTicks = Math.min(failures, MAX_SKIPPED_TICKS);
+			if (error.retryAfterSeconds) {
+				skipUntil = now.add({ seconds: error.retryAfterSeconds });
+			} else {
+				skipTicks = Math.min(failures, MAX_SKIPPED_TICKS);
+			}
+			await announceRateLimit();
 		}
 		log.warn(
-			{ failures, skipTicks, err: error.message },
+			{
+				failures,
+				skipTicks,
+				skipUntil: skipUntil?.toString(),
+				err: error.message,
+			},
 			"watchdog check failed",
 		);
 
@@ -157,6 +182,12 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 	};
 
 	const recover = async () => {
+		if (rateLimitAnnounced) {
+			rateLimitAnnounced = false;
+			await deps.notifyAdmin({
+				text: "▶️ Fresha rate limit lifted, checks resumed",
+			});
+		}
 		if (failures >= ENV.FAILURE_ALERT_THRESHOLD) {
 			await deps.notify({
 				text: `Fresha OK again after ${failures} failed checks`,
@@ -173,6 +204,15 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		const salonNow = formatWallClock(now, ENV.SALON_TIME_ZONE);
 
 		repo.deleteAlertsBefore(salonNow);
+
+		if (skipUntil && Temporal.Instant.compare(now, skipUntil) < 0) {
+			log.info(
+				{ skipUntil: skipUntil.toString() },
+				"watchdog check skipped until Fresha's Retry-After",
+			);
+			return { ok: false, skipped: true };
+		}
+		skipUntil = null;
 
 		if (skipTicks > 0) {
 			skipTicks--;
@@ -197,7 +237,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			deps.sleep,
 		);
 
-		if (slots instanceof FreshaError) return fail(slots);
+		if (slots instanceof FreshaError) return fail(slots, now);
 		await recover();
 
 		const current = new Map(slots.map((slot) => [slotKey(slot), slot]));

@@ -1,3 +1,4 @@
+import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 import { FreshaError, type FreshaModel } from "./model";
 
@@ -58,6 +59,7 @@ type TimeScreen = {
 	dates: {
 		date: { iso: string };
 		isAvailableToBeBooked: boolean;
+		isLoading?: boolean;
 		action: { id: string } | null;
 	}[];
 	day: {
@@ -143,6 +145,13 @@ export const parseSlots = (
 		? (day.timeslots ?? []).map((slot) => ({ date, time: slot.time }))
 		: [];
 
+const TOO_MANY_REQUESTS = 429;
+
+const parseRetryAfter = (res: Response): number | undefined => {
+	const seconds = Number(res.headers.get("retry-after"));
+	return Number.isInteger(seconds) && seconds > 0 ? seconds : undefined;
+};
+
 export type FreshaOptions = {
 	stepDelayMs?: number;
 	sleep?: Sleep;
@@ -157,6 +166,11 @@ export const createFreshaService = (
 		variables: Record<string, unknown>,
 	): Promise<T | FreshaError> => {
 		const { name, hash } = OPERATIONS[operation];
+		const action =
+			typeof variables.id === "string"
+				? parseActionId(variables.id).type
+				: undefined;
+		const startedAt = performance.now();
 		const res = await fetchFn(ENDPOINT, {
 			method: "POST",
 			headers: {
@@ -175,8 +189,30 @@ export const createFreshaService = (
 			}),
 		});
 
+		log.debug(
+			{
+				operation: name,
+				action,
+				status: res.status,
+				durationMs: Math.round(performance.now() - startedAt),
+			},
+			"fresha call",
+		);
+
 		if (!res.ok) {
-			return new FreshaError(`${name}: HTTP ${res.status}`, "http", res.status);
+			const retryAfterSeconds = parseRetryAfter(res);
+			if (res.status === TOO_MANY_REQUESTS) {
+				log.warn(
+					{ operation: name, action, retryAfterSeconds },
+					"fresha rate limited",
+				);
+			}
+			return new FreshaError(
+				`${name}: HTTP ${res.status}`,
+				"http",
+				res.status,
+				retryAfterSeconds,
+			);
 		}
 
 		const body = (await res.json()) as GraphqlResponse<T>;
@@ -304,31 +340,40 @@ export const createFreshaService = (
 		const time = await press(continueAction.id, cart.cartId);
 		if (time instanceof FreshaError) return time;
 
-		const dates = time.screenTime.dates;
+		let { dates, day } = time.screenTime;
 		if (!dates) return new FreshaError("time screen has no reached", "graphql");
 
 		const slots: FreshaModel["slot"][] = [];
+		const read = new Set<string>();
 		let opened = 0;
-		for (const entry of dates.slice(0, daysAhead)) {
-			if (!entry.isAvailableToBeBooked) continue;
-			const date = entry.date.iso.slice(0, 10);
+		const nextDay = () => {
+			const pending = (dates ?? [])
+				.slice(0, daysAhead)
+				.filter(
+					(entry) => entry.isAvailableToBeBooked && !read.has(entry.date.iso),
+				);
+			return pending.find((entry) => !entry.isLoading) ?? pending[0];
+		};
 
-			if (!entry.action) {
-				const day = time.screenTime.day;
-				if (!day) return new FreshaError(`day ${date} not reached`, "graphql");
-				slots.push(...parseSlots(date, day));
-				continue;
+		for (let entry = nextDay(); entry; entry = nextDay()) {
+			const date = entry.date.iso.slice(0, 10);
+			read.add(entry.date.iso);
+
+			if (entry.action) {
+				if (opened++ > 0 && stepDelayMs > 0) await sleep(stepDelayMs);
+				const pressed = await press(entry.action.id, cart.cartId);
+				if (pressed instanceof FreshaError) return pressed;
+
+				day = pressed.screenTime.day;
+				dates = pressed.screenTime.dates ?? dates;
 			}
 
-			if (opened++ > 0 && stepDelayMs > 0) await sleep(stepDelayMs);
-			const pressed = await press(entry.action.id, cart.cartId);
-			if (pressed instanceof FreshaError) return pressed;
-
-			const day = pressed.screenTime.day;
 			if (!day) return new FreshaError(`day ${date} not reached`, "graphql");
 			slots.push(...parseSlots(date, day));
 		}
-		return slots;
+		return slots.toSorted(
+			(a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
+		);
 	};
 
 	return { listServices, listEmployees, listSlots };

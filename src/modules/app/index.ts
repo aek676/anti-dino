@@ -32,6 +32,7 @@ const app = new Elysia()
 				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
 			}),
 			notify: telegramService.notify,
+			notifyAdmin: telegramService.notifyAdmin,
 			edit: telegramService.edit,
 		}),
 	)

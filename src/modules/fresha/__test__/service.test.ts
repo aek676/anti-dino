@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import { log } from "@/utils/logger";
 import { FreshaError } from "../model";
 import {
 	createFreshaService,
@@ -77,6 +78,26 @@ describe("listServices", () => {
 
 		expect(result).toBeInstanceOf(FreshaError);
 		expect(result).toMatchObject({ kind: "http" });
+	});
+
+	test("keeps the Retry-After of a rate limited response", async () => {
+		const rateLimited: FetchFn = () =>
+			Promise.resolve(
+				Response.json({}, { status: 429, headers: { "retry-after": "711" } }),
+			);
+
+		const result = await createFreshaService(rateLimited).listServices(slug);
+
+		expect(result).toMatchObject({ status: 429, retryAfterSeconds: 711 });
+	});
+
+	test("leaves the Retry-After empty when Fresha does not send one", async () => {
+		const result = await createFreshaService(respond({}, 429)).listServices(
+			slug,
+		);
+
+		expect(result).toMatchObject({ status: 429 });
+		expect((result as FreshaError).retryAfterSeconds).toBeUndefined();
 	});
 
 	test("returns a graphql error when the response carries errors", async () => {
@@ -259,7 +280,7 @@ describe("listSlots", () => {
 		return { fetchFn, pressed };
 	};
 
-	test("selects the employee and opens only the available days", async () => {
+	test("selects the employee and opens the days that may have slots", async () => {
 		const { fetchFn, pressed } = router();
 
 		const result = await createFreshaService(fetchFn).listSlots(
@@ -274,13 +295,81 @@ describe("listSlots", () => {
 			"onScreenServicesContinue",
 			"onScreenEmployeeSet",
 			"onScreenEmployeeContinue",
-			...Array<string>(24).fill("onScreenTimeDaySelectorDateSet"),
+			...Array<string>(21).fill("onScreenTimeDaySelectorDateSet"),
 		]);
 		expect(pressed[2]).toMatchObject({ employeeId: 3182031 });
 		expect(pressed[4]).toMatchObject({ date: "2026-09-08" });
 
-		expect(result).toHaveLength(24 * 14);
+		expect(result).toHaveLength(21 * 14);
 		expect(result).toContainEqual({ date: "2026-09-08", time: "12:15" });
+	});
+
+	test("stops opening loading days once one of them resolves the rest", async () => {
+		const resolved = structuredClone(day);
+		const screenTime = resolved.data.bookingFlowActionButtonPressed.screenTime;
+		Object.assign(screenTime, {
+			dates: screenTime.dates.map((entry) =>
+				entry.isLoading
+					? {
+							...entry,
+							isLoading: false,
+							isAvailableToBeBooked: entry.date.iso.startsWith("2026-09-24"),
+						}
+					: entry,
+			),
+		});
+		const { fetchFn, pressed } = router();
+		const resolving: FetchFn = (url, init) =>
+			(init.body as string).includes('\\"date\\":\\"2026-09-24\\"')
+				? Promise.resolve(Response.json(resolved))
+				: fetchFn(url, init);
+
+		const result = await createFreshaService(resolving).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			31,
+		);
+
+		const opened = pressed
+			.filter((a) => a.type === "onScreenTimeDaySelectorDateSet")
+			.map((a) => a.date);
+		expect(opened).toHaveLength(9);
+		expect(opened).not.toContain("2026-09-25");
+		expect(result).toHaveLength(10 * 14);
+		expect(result).toContainEqual({ date: "2026-09-24", time: "12:15" });
+	});
+
+	test("hands back the Retry-After of a 429 that hits halfway through the days", async () => {
+		const warn = spyOn(log, "warn");
+		const { fetchFn } = router();
+		const limited: FetchFn = (url, init) =>
+			(init.body as string).includes('\\"date\\":\\"2026-09-10\\"')
+				? Promise.resolve(
+						Response.json(
+							{},
+							{ status: 429, headers: { "retry-after": "711" } },
+						),
+					)
+				: fetchFn(url, init);
+
+		const result = await createFreshaService(limited).listSlots(
+			slug,
+			"sv:18605549",
+			3182031,
+			31,
+		);
+
+		expect(result).toMatchObject({ status: 429, retryAfterSeconds: 711 });
+		expect(warn).toHaveBeenCalledWith(
+			{
+				operation: "BookingFlow_ActionButtonPressed_Mutation",
+				action: "onScreenTimeDaySelectorDateSet",
+				retryAfterSeconds: 711,
+			},
+			"fresha rate limited",
+		);
+		warn.mockRestore();
 	});
 
 	test("reads the preselected day from the time screen instead of pressing it", async () => {
