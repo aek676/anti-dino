@@ -119,6 +119,12 @@ describe("check", () => {
 		sent.push(message);
 		return Promise.resolve(new Map([[chatId, sent.length]]));
 	};
+	let direct: { chatId: number; message: Message }[];
+	const DirectMessageId = 900;
+	const send = (chatId: number, message: Message) => {
+		direct.push({ chatId, message });
+		return Promise.resolve(DirectMessageId);
+	};
 	let sentToAdmin: string[];
 	const notifyAdmin = (message: Message) => {
 		sentToAdmin.push(message.text);
@@ -138,6 +144,7 @@ describe("check", () => {
 		createWatchdogService({
 			db,
 			fresha,
+			send,
 			notify,
 			notifyAdmin,
 			edit,
@@ -159,6 +166,7 @@ describe("check", () => {
 	beforeEach(() => {
 		db = openDatabase(":memory:");
 		sent = [];
+		direct = [];
 		sentToAdmin = [];
 		edited = [];
 		clock = Temporal.Instant.from("2026-09-14T10:00:00Z");
@@ -489,6 +497,7 @@ describe("check", () => {
 			now,
 			sleep,
 			edit,
+			send,
 			notifyAdmin,
 			notify: () => Promise.reject(new Error("telegram down")),
 		});
@@ -565,5 +574,78 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(1);
 		expect(countSlots()).toBe(0);
+	});
+
+	test("sendSlots sends the slots known right now to one chat", async () => {
+		const watchdog = service(fake([slotA, slotC]));
+		await watchdog.check();
+
+		await watchdog.sendSlots(7);
+
+		expect(direct).toEqual([
+			{
+				chatId: 7,
+				message: {
+					text: [
+						"<b>🟢 2 slots available</b>",
+						"<b>Thu, Sep 17</b>\n<code>11:30</code>",
+						"<b>Fri, Sep 18</b>\n<code>10:00</code>",
+					].join("\n\n"),
+					buttons: bookButton,
+				},
+			},
+		]);
+		expect(sent).toHaveLength(1);
+	});
+
+	test("sendSlots keeps its message up to date when a slot goes", async () => {
+		let slots = [slotA, slotB];
+		const watchdog = service({ listSlots: () => Promise.resolve(slots) });
+		await watchdog.check();
+		await watchdog.sendSlots(7);
+
+		slots = [slotB];
+		await watchdog.check();
+
+		expect(edited).toContainEqual({
+			chatId: 7,
+			messageId: DirectMessageId,
+			message: {
+				text: [
+					"<b>🟡 1 of 2 slots left</b>",
+					"<b>Thu, Sep 17</b>\n<s>11:30</s>  <code>11:45</code>",
+				].join("\n\n"),
+				buttons: bookButton,
+			},
+		});
+	});
+
+	test("sendSlots leaves out the slots that already started", async () => {
+		const watchdog = service(fake([slotA, slotC]));
+		await watchdog.check();
+
+		clock = Temporal.Instant.from("2026-09-17T20:00:00Z");
+		await watchdog.sendSlots(7);
+
+		expect(direct[0]?.message.text).toBe(
+			[
+				"<b>🟢 1 slot available</b>",
+				"<b>Fri, Sep 18</b>\n<code>10:00</code>",
+			].join("\n\n"),
+		);
+	});
+
+	test("sendSlots says so when there is nothing to book", async () => {
+		await service(fake([])).sendSlots(7);
+
+		expect(direct).toEqual([
+			{
+				chatId: 7,
+				message: {
+					text: "No slots available right now. I'll message you as soon as one opens up.",
+				},
+			},
+		]);
+		expect(countAlerts()).toBe(0);
 	});
 });

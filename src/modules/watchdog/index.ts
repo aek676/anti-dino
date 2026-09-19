@@ -2,11 +2,13 @@ import { cron } from "@elysia/cron";
 import Elysia from "elysia";
 import { ENV } from "varlock/env";
 import { log } from "@/utils/logger";
-import { createWatchdogService, type WatchdogDeps } from "./service";
+import type { createWatchdogService } from "./service";
 
-export const watchdog = (deps: WatchdogDeps) => {
-	const watchdogService = createWatchdogService(deps);
+export { createWatchdogService } from "./service";
 
+export const watchdog = (
+	watchdogService: ReturnType<typeof createWatchdogService>,
+) => {
 	return new Elysia({ name: "watchdog" }).use(
 		cron({
 			name: "watchdog",

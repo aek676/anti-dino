@@ -22,6 +22,7 @@ export type WatchdogDeps = {
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (message: Message) => Promise<Delivery>;
 	notifyAdmin: (message: Message) => Promise<void>;
+	send: (chatId: ChatId, message: Message) => Promise<MessageId | undefined>;
 	edit: (
 		chatId: ChatId,
 		messageId: MessageId,
@@ -114,6 +115,21 @@ const formatNewSlotsMessage = (
 		bookingUrl,
 	);
 
+const formatCurrentSlotsMessage = (
+	startTimes: string[],
+	bookingUrl: string,
+): Message =>
+	startTimes.length > 0
+		? formatAlert(
+				`🟢 ${startTimes.length} ${slotWord(startTimes.length)} available`,
+				startTimes,
+				new Set(startTimes),
+				bookingUrl,
+			)
+		: {
+				text: "No slots available right now. I'll message you as soon as one opens up.",
+			};
+
 const formatUpdatedMessage = (
 	startTimes: string[],
 	live: Set<string>,
@@ -134,6 +150,10 @@ export type CheckResult =
 
 export const createWatchdogService = (deps: WatchdogDeps) => {
 	const repo = createWatchdogRepository(deps.db);
+	const target: WatchTarget = {
+		employeeId: String(ENV.FRESHA_EMPLOYEE_ID),
+		serviceId: ENV.FRESHA_SERVICE_ID,
+	};
 	let failures = 0;
 	let skipTicks = 0;
 	let skipUntil: Temporal.Instant | null = null;
@@ -220,11 +240,6 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			return { ok: false, skipped: true };
 		}
 
-		const target: WatchTarget = {
-			employeeId: String(ENV.FRESHA_EMPLOYEE_ID),
-			serviceId: ENV.FRESHA_SERVICE_ID,
-		};
-
 		const slots = await retry(
 			() =>
 				deps.fresha.listSlots(
@@ -279,5 +294,23 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		return { ok: true, newSlots: newStartTimes, goneSlots: goneStartTimes };
 	};
 
-	return { check };
+	const sendSlots = async (chatId: ChatId) => {
+		const salonNow = formatWallClock(
+			(deps.now ?? Temporal.Now.instant)(),
+			ENV.SALON_TIME_ZONE,
+		);
+		const startTimes = repo
+			.listSlotStartTimes(target)
+			.filter((startsAt) => startsAt >= salonNow);
+
+		const messageId = await deps.send(
+			chatId,
+			formatCurrentSlotsMessage(startTimes, ENV.FRESHA_BOOKING_URL),
+		);
+		if (messageId === undefined) return;
+
+		repo.insertAlerts(new Map([[chatId, messageId]]), target, startTimes);
+	};
+
+	return { check, sendSlots };
 };

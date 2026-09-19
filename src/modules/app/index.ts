@@ -4,7 +4,7 @@ import { ENV } from "varlock/env";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
 import { createTelegramService, telegram } from "@/modules/telegram";
-import { watchdog } from "@/modules/watchdog";
+import { createWatchdogService, watchdog } from "@/modules/watchdog";
 import { closeDatabase, db } from "@/utils/db";
 import { log } from "@/utils/logger";
 
@@ -14,6 +14,18 @@ const telegramService = createTelegramService({
 	db,
 	bot,
 	adminChatId: ENV.ADMIN_CHAT_ID,
+	sendSlots: (chatId) => watchdogService.sendSlots(chatId),
+});
+
+const watchdogService = createWatchdogService({
+	db,
+	fresha: createFreshaService(fetch, {
+		stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
+	}),
+	send: telegramService.send,
+	notify: telegramService.notify,
+	notifyAdmin: telegramService.notifyAdmin,
+	edit: telegramService.edit,
 });
 
 const app = new Elysia()
@@ -25,17 +37,7 @@ const app = new Elysia()
 	.use(health(db))
 	.decorate("db", db)
 	.use(fresha())
-	.use(
-		watchdog({
-			db,
-			fresha: createFreshaService(fetch, {
-				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
-			}),
-			notify: telegramService.notify,
-			notifyAdmin: telegramService.notifyAdmin,
-			edit: telegramService.edit,
-		}),
-	)
+	.use(watchdog(watchdogService))
 	.use(telegram(bot))
 	.onStop(({ store }) => {
 		store.cron.watchdog.stop();

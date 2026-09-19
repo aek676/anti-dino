@@ -18,6 +18,14 @@ export const telegram = (bot: Bot) => {
 		.onStart(async () => {
 			try {
 				await bot.init();
+				await bot.api.setMyCommands([
+					{ command: "start", description: "Subscribe to the alerts" },
+					{
+						command: "slots",
+						description: "See the slots available right now",
+					},
+					{ command: "stop", description: "Unsubscribe" },
+				]);
 				await bot.api.setWebhook(ENV.PUBLIC_URL + ENV.WEBHOOK_PATH, {
 					secret_token: ENV.TELEGRAM_WEBHOOK_SECRET,
 				});
