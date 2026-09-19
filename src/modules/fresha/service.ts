@@ -157,6 +157,8 @@ export type FreshaOptions = {
 	sleep?: Sleep;
 };
 
+export type FreshaService = ReturnType<typeof createFreshaService>;
+
 export const createFreshaService = (
 	fetchFn: FetchFn = fetch,
 	{ stepDelayMs = 0, sleep = defaultSleep }: FreshaOptions = {},

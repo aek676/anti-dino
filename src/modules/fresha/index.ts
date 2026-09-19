@@ -4,7 +4,7 @@ import { FreshaError, FreshaModel } from "./model";
 import { createFreshaService } from "./service";
 
 export { FreshaError, type FreshaModel } from "./model";
-export { createFreshaService } from "./service";
+export { createFreshaService, type FreshaService } from "./service";
 
 export const fresha = () => {
 	const freshaService = createFreshaService(fetch, {

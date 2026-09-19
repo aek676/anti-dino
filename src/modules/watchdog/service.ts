@@ -1,5 +1,5 @@
 import { ENV } from "varlock/env";
-import { type createFreshaService, FreshaError } from "@/modules/fresha";
+import { FreshaError, type FreshaService } from "@/modules/fresha";
 import {
 	formatNewSlotsMessage,
 	formatUpdatedMessage,
@@ -20,7 +20,7 @@ import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 
 export type WatchdogDeps = {
 	repo: SlotsRepository;
-	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
+	fresha: Pick<FreshaService, "listSlots">;
 	notify: (message: Message) => Promise<Delivery>;
 	notifyAdmin: (message: Message) => Promise<void>;
 	edit: (
