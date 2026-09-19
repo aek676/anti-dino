@@ -4,7 +4,13 @@ import {
 	FreshaError,
 	type FreshaModel,
 } from "@/modules/fresha";
-import type { ChatId, Delivery, MessageId } from "@/modules/telegram";
+import {
+	type ChatId,
+	type Delivery,
+	escapeHtml,
+	type Message,
+	type MessageId,
+} from "@/modules/telegram";
 import { formatDay, formatWallClock } from "@/utils/date";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
@@ -14,8 +20,12 @@ import { createWatchdogRepository, type WatchTarget } from "./repository";
 export type WatchdogDeps = {
 	db: Db;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
-	notify: (text: string) => Promise<Delivery>;
-	edit: (chatId: ChatId, messageId: MessageId, text: string) => Promise<void>;
+	notify: (message: Message) => Promise<Delivery>;
+	edit: (
+		chatId: ChatId,
+		messageId: MessageId,
+		message: Message,
+	) => Promise<void>;
 	now?: () => Temporal.Instant;
 	sleep?: Sleep;
 };
@@ -54,39 +64,67 @@ const slotKey = (slot: FreshaModel["slot"]) => `${slot.date}T${slot.time}`;
 const byDateTime = (a: FreshaModel["slot"], b: FreshaModel["slot"]) =>
 	a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
 
-const formatSlots = (slots: FreshaModel["slot"][]): string[] =>
-	Object.entries(
-		Object.groupBy(slots.toSorted(byDateTime), (slot) => slot.date),
-	).map(
-		([date, daySlots]) =>
-			`${formatDay(date)}: ${daySlots?.map((slot) => slot.time).join(", ")}`,
-	);
-
-const formatNewSlotsMessage = (
-	slots: FreshaModel["slot"][],
-	bookingUrl: string,
-): string =>
-	[`${slots.length} new slot(s):`, ...formatSlots(slots), bookingUrl].join(
-		"\n",
-	);
-
 const toSlot = (startsAt: string): FreshaModel["slot"] => {
 	const [date = "", time = ""] = startsAt.split("T");
 	return { date, time };
 };
 
+const slotWord = (count: number) => (count === 1 ? "slot" : "slots");
+
+const formatDays = (startTimes: string[], live: Set<string>): string[] =>
+	Object.entries(
+		Object.groupBy(
+			startTimes.map(toSlot).toSorted(byDateTime),
+			(slot) => slot.date,
+		),
+	).map(([date, daySlots = []]) =>
+		[
+			`<b>${formatDay(date)}</b>`,
+			daySlots
+				.map((slot) =>
+					live.has(slotKey(slot))
+						? `<code>${slot.time}</code>`
+						: `<s>${slot.time}</s>`,
+				)
+				.join("  "),
+		].join("\n"),
+	);
+
+const formatAlert = (
+	header: string,
+	startTimes: string[],
+	live: Set<string>,
+	bookingUrl: string,
+): Message => ({
+	text: [`<b>${header}</b>`, ...formatDays(startTimes, live)].join("\n\n"),
+	buttons: startTimes.some((key) => live.has(key))
+		? [[{ label: "Book on Fresha", url: bookingUrl }]]
+		: [],
+});
+
+const formatNewSlotsMessage = (
+	startTimes: string[],
+	bookingUrl: string,
+): Message =>
+	formatAlert(
+		`🟢 ${startTimes.length} new ${slotWord(startTimes.length)}`,
+		startTimes,
+		new Set(startTimes),
+		bookingUrl,
+	);
+
 const formatUpdatedMessage = (
 	startTimes: string[],
 	live: Set<string>,
 	bookingUrl: string,
-): string => {
-	const remaining = startTimes.filter((key) => live.has(key));
+): Message => {
+	const remaining = startTimes.filter((key) => live.has(key)).length;
 	const header =
-		remaining.length > 0
-			? `${remaining.length} of ${startTimes.length} slot(s) still available:`
-			: "No slots left from this alert:";
+		remaining > 0
+			? `🟡 ${remaining} of ${startTimes.length} ${slotWord(startTimes.length)} left`
+			: "⚪ No slots left from this alert";
 
-	return [header, ...formatSlots(remaining.map(toSlot)), bookingUrl].join("\n");
+	return formatAlert(header, startTimes, live, bookingUrl);
 };
 
 export type CheckResult =
@@ -119,16 +157,20 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		);
 
 		if (failures === ENV.FAILURE_ALERT_THRESHOLD) {
-			await deps.notify(
-				`Fresha API error (${failures} checks in a row): ${error.message}`,
-			);
+			await deps.notify({
+				text: escapeHtml(
+					`Fresha API error (${failures} checks in a row): ${error.message}`,
+				),
+			});
 		}
 		return { ok: false as const };
 	};
 
 	const recover = async () => {
 		if (failures >= ENV.FAILURE_ALERT_THRESHOLD) {
-			await deps.notify(`Fresha OK again after ${failures} failed checks`);
+			await deps.notify({
+				text: `Fresha OK again after ${failures} failed checks`,
+			});
 		}
 		failures = 0;
 	};
@@ -205,10 +247,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		if (newSlots.length > 0) {
 			const delivery = await deps.notify(
-				formatNewSlotsMessage(
-					newSlots.map(([, slot]) => slot),
-					ENV.FRESHA_BOOKING_URL,
-				),
+				formatNewSlotsMessage(newStartTimes, ENV.FRESHA_BOOKING_URL),
 			);
 
 			repo.insertAlerts(delivery, target, newStartTimes);

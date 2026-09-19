@@ -1,13 +1,23 @@
-import { type Bot, GrammyError } from "grammy";
+import { type Bot, GrammyError, InlineKeyboard } from "grammy";
 import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
-import type { ChatId, Delivery, MessageId } from "./model";
+import type { ChatId, Delivery, Message, MessageId } from "./model";
 
 export type TelegramDeps = {
 	db: Db;
 	adminChatId: number;
 	bot: Bot;
 };
+
+const toOptions = ({ buttons = [] }: Message) => ({
+	parse_mode: "HTML" as const,
+	link_preview_options: { is_disabled: true },
+	reply_markup: InlineKeyboard.from(
+		buttons.map((row) =>
+			row.map((button) => InlineKeyboard.url(button.label, button.url)),
+		),
+	),
+});
 
 export const createTelegramService = (deps: TelegramDeps) => {
 	const subscribe = (chatId: number) => {
@@ -34,9 +44,18 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		return query.all().map((row) => row.chat_id);
 	};
 
-	const edit = async (chatId: ChatId, messageId: MessageId, text: string) => {
+	const edit = async (
+		chatId: ChatId,
+		messageId: MessageId,
+		message: Message,
+	) => {
 		try {
-			await deps.bot.api.editMessageText(chatId, messageId, text);
+			await deps.bot.api.editMessageText(
+				chatId,
+				messageId,
+				message.text,
+				toOptions(message),
+			);
 		} catch (error) {
 			if (
 				error instanceof GrammyError &&
@@ -51,12 +70,16 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		}
 	};
 
-	const notify = async (text: string): Promise<Delivery> => {
+	const notify = async (message: Message): Promise<Delivery> => {
 		const users = new Set([...listSubscribers(), deps.adminChatId]);
 		const delivered = new Map();
 		for (const chatId of users) {
 			try {
-				const { message_id } = await deps.bot.api.sendMessage(chatId, text);
+				const { message_id } = await deps.bot.api.sendMessage(
+					chatId,
+					message.text,
+					toOptions(message),
+				);
 				delivered.set(chatId, message_id);
 			} catch (error) {
 				log.warn(
