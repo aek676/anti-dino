@@ -1,19 +1,18 @@
 import { ENV } from "varlock/env";
 import type { ChatId, Message, MessageId } from "@/modules/telegram";
 import { formatWallClock } from "@/utils/date";
-import type { Db } from "@/utils/db";
 import { formatCurrentSlotsMessage } from "./format";
 import { watchTarget } from "./model";
-import { createSlotsRepository } from "./repository";
+import type { SlotsRepository } from "./repository";
 
 export type SlotsDeps = {
-	db: Db;
+	repo: SlotsRepository;
 	send: (chatId: ChatId, message: Message) => Promise<MessageId | undefined>;
 	now?: () => Temporal.Instant;
 };
 
 export const createSlotsService = (deps: SlotsDeps) => {
-	const repo = createSlotsRepository(deps.db);
+	const { repo } = deps;
 	const target = watchTarget();
 
 	/** The table can lag behind while Fresha rate limits us, so slots that already started are left out. */

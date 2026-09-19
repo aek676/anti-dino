@@ -1,9 +1,9 @@
 import { ENV } from "varlock/env";
 import { type createFreshaService, FreshaError } from "@/modules/fresha";
 import {
-	createSlotsRepository,
 	formatNewSlotsMessage,
 	formatUpdatedMessage,
+	type SlotsRepository,
 	slotKey,
 	watchTarget,
 } from "@/modules/slots";
@@ -15,12 +15,11 @@ import {
 	type MessageId,
 } from "@/modules/telegram";
 import { formatWallClock } from "@/utils/date";
-import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 
 export type WatchdogDeps = {
-	db: Db;
+	repo: SlotsRepository;
 	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
 	notify: (message: Message) => Promise<Delivery>;
 	notifyAdmin: (message: Message) => Promise<void>;
@@ -67,7 +66,7 @@ export type CheckResult =
 	| { ok: false; skipped?: true };
 
 export const createWatchdogService = (deps: WatchdogDeps) => {
-	const repo = createSlotsRepository(deps.db);
+	const { repo } = deps;
 	const target = watchTarget();
 	let failures = 0;
 	let skipTicks = 0;

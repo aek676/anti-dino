@@ -3,7 +3,7 @@ import { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
-import { createSlotsService } from "@/modules/slots";
+import { createSlotsRepository, createSlotsService } from "@/modules/slots";
 import {
 	createTelegramService,
 	registerCommands,
@@ -21,7 +21,12 @@ const telegramService = createTelegramService({
 	adminChatId: ENV.ADMIN_CHAT_ID,
 });
 
-const slotsService = createSlotsService({ db, send: telegramService.send });
+const slotsRepository = createSlotsRepository(db);
+
+const slotsService = createSlotsService({
+	repo: slotsRepository,
+	send: telegramService.send,
+});
 
 registerCommands(bot, {
 	subscribe: telegramService.subscribe,
@@ -41,7 +46,7 @@ const app = new Elysia()
 	.use(fresha())
 	.use(
 		watchdog({
-			db,
+			repo: slotsRepository,
 			fresha: createFreshaService(fetch, {
 				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
 			}),

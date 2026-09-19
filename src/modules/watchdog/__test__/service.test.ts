@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ENV } from "varlock/env";
 import { FreshaError, type FreshaModel } from "@/modules/fresha";
+import { createSlotsRepository } from "@/modules/slots";
 import type { Message } from "@/modules/telegram";
 import { type Db, openDatabase } from "@/utils/db";
 import { createWatchdogService, retry } from "../service";
@@ -136,7 +137,7 @@ describe("check", () => {
 		listSlots: () => Promise<Slot[] | FreshaError>;
 	}) =>
 		createWatchdogService({
-			db,
+			repo: createSlotsRepository(db),
 			fresha,
 			notify,
 			notifyAdmin,
@@ -484,7 +485,7 @@ describe("check", () => {
 	test("does not persist when notify fails, so the next run alerts again", async () => {
 		const fresha = fake([slotA]);
 		const broken = createWatchdogService({
-			db,
+			repo: createSlotsRepository(db),
 			fresha,
 			now,
 			sleep,

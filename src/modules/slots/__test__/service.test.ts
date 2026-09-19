@@ -21,7 +21,7 @@ describe("slots service", () => {
 
 	const service = () =>
 		createSlotsService({
-			db,
+			repo: createSlotsRepository(db),
 			now: () => clock,
 			send: (chatId, message) => {
 				sent.push({ chatId, message });

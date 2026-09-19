@@ -2,6 +2,8 @@ import type { ChatId, Delivery, MessageId } from "@/modules/telegram";
 import type { Db } from "@/utils/db";
 import type { WatchTarget } from "./model";
 
+export type SlotsRepository = ReturnType<typeof createSlotsRepository>;
+
 export const createSlotsRepository = (db: Db) => {
 	const selectSlotStartTimes = db.query<{ starts_at: string }, WatchTarget>(
 		"SELECT starts_at FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId ORDER BY starts_at",
