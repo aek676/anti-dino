@@ -1,6 +1,11 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Bot, Context } from "grammy";
+import { type Db, openDatabase } from "@/utils/db";
 import { COMMANDS, registerCommands } from "../commands";
+import {
+	createSubscribersRepository,
+	type SubscribersRepository,
+} from "../repository";
 
 type Handler = (ctx: Context) => unknown;
 type Keyboard = {
@@ -45,19 +50,14 @@ const fakeCtx = (chatId: number) => {
 };
 
 describe("telegram commands", () => {
-	let subscribers: Set<number>;
+	let db: Db;
+	let repo: SubscribersRepository;
 	let slotsSentTo: number[];
 
 	const setup = () => {
 		const { bot, commands, callbacks } = fakeBot();
 		registerCommands(bot, {
-			subscribe: (chatId) => {
-				subscribers.add(chatId);
-			},
-			unsubscribe: (chatId) => {
-				subscribers.delete(chatId);
-			},
-			isSubscribed: (chatId) => subscribers.has(chatId),
+			...repo,
 			sendSlots: (chatId) => {
 				slotsSentTo.push(chatId);
 				return Promise.resolve();
@@ -67,8 +67,12 @@ describe("telegram commands", () => {
 	};
 
 	beforeEach(() => {
-		subscribers = new Set();
+		db = openDatabase(":memory:");
+		repo = createSubscribersRepository(db);
 		slotsSentTo = [];
+	});
+	afterEach(() => {
+		db.close();
 	});
 
 	test("/start welcomes a new chat with the commands and a start button", async () => {
@@ -77,7 +81,7 @@ describe("telegram commands", () => {
 
 		await commands.get("start")?.(ctx);
 
-		expect([...subscribers]).toEqual([]);
+		expect(repo.listSubscribers()).toEqual([]);
 		expect(slotsSentTo).toEqual([]);
 		expect(replies).toHaveLength(1);
 		for (const { command } of COMMANDS)
@@ -93,7 +97,7 @@ describe("telegram commands", () => {
 
 		await callbacks.get("subscribe")?.(ctx);
 
-		expect([...subscribers]).toEqual([10]);
+		expect(repo.listSubscribers()).toEqual([10]);
 		expect(events).toEqual(["answered", "button removed"]);
 		expect(replies).toEqual(["You have subscribed to notifications."]);
 		expect(slotsSentTo).toEqual([10]);
@@ -101,7 +105,7 @@ describe("telegram commands", () => {
 
 	test("/start sends the current slots to a chat that already subscribed", async () => {
 		const { commands } = setup();
-		subscribers.add(10);
+		repo.subscribe(10);
 		const { ctx, replies } = fakeCtx(10);
 
 		await commands.get("start")?.(ctx);
@@ -121,12 +125,12 @@ describe("telegram commands", () => {
 
 	test("/stop unsubscribes the chat and confirms", async () => {
 		const { commands } = setup();
-		subscribers.add(10);
+		repo.subscribe(10);
 		const { ctx, replies } = fakeCtx(10);
 
 		await commands.get("stop")?.(ctx);
 
-		expect([...subscribers]).toEqual([]);
+		expect(repo.listSubscribers()).toEqual([]);
 		expect(replies).toEqual(["You have unsubscribed from notifications."]);
 	});
 });

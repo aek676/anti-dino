@@ -5,6 +5,7 @@ import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
 import { createSlotsRepository, createSlotsService } from "@/modules/slots";
 import {
+	createSubscribersRepository,
 	createTelegramService,
 	registerCommands,
 	telegram,
@@ -15,8 +16,10 @@ import { log } from "@/utils/logger";
 
 const bot = new Bot(ENV.TELEGRAM_BOT_TOKEN);
 
+const subscribersRepository = createSubscribersRepository(db);
+
 const telegramService = createTelegramService({
-	db,
+	repo: subscribersRepository,
 	bot,
 	adminChatId: ENV.ADMIN_CHAT_ID,
 });
@@ -29,9 +32,9 @@ const slotsService = createSlotsService({
 });
 
 registerCommands(bot, {
-	subscribe: telegramService.subscribe,
-	unsubscribe: telegramService.unsubscribe,
-	isSubscribed: telegramService.isSubscribed,
+	subscribe: subscribersRepository.subscribe,
+	unsubscribe: subscribersRepository.unsubscribe,
+	isSubscribed: subscribersRepository.isSubscribed,
 	sendSlots: slotsService.sendCurrent,
 });
 

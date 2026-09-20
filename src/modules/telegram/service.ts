@@ -1,10 +1,10 @@
 import { type Bot, GrammyError, InlineKeyboard } from "grammy";
-import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import type { ChatId, Delivery, Message, MessageId } from "./model";
+import type { SubscribersRepository } from "./repository";
 
 export type TelegramDeps = {
-	db: Db;
+	repo: Pick<SubscribersRepository, "listSubscribers">;
 	adminChatId: number;
 	bot: Bot;
 };
@@ -20,43 +20,6 @@ const toOptions = ({ buttons = [] }: Message) => ({
 });
 
 export const createTelegramService = (deps: TelegramDeps) => {
-	const insertSubscriber = deps.db.query<
-		void,
-		{ chatId: number; createdAt: string }
-	>(
-		`INSERT OR IGNORE INTO subscribers (chat_id, created_at) VALUES (:chatId, :createdAt)`,
-	);
-
-	const deleteSubscriber = deps.db.query<void, { chatId: number }>(
-		`DELETE FROM subscribers WHERE chat_id = :chatId`,
-	);
-
-	const selectSubscriber = deps.db.query<
-		{ chat_id: number },
-		{ chatId: number }
-	>(`SELECT chat_id FROM subscribers WHERE chat_id = :chatId`);
-
-	const selectSubscribers = deps.db.query<{ chat_id: number }, []>(
-		`SELECT chat_id FROM subscribers`,
-	);
-
-	const subscribe = (chatId: number) => {
-		insertSubscriber.run({
-			chatId,
-			createdAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
-		});
-	};
-
-	const unsubscribe = (chatId: number) => {
-		deleteSubscriber.run({ chatId });
-	};
-
-	const isSubscribed = (chatId: number) =>
-		selectSubscriber.get({ chatId }) !== null;
-
-	const listSubscribers = () =>
-		selectSubscribers.all().map((row) => row.chat_id);
-
 	const edit = async (
 		chatId: ChatId,
 		messageId: MessageId,
@@ -100,7 +63,7 @@ export const createTelegramService = (deps: TelegramDeps) => {
 	};
 
 	const notify = async (message: Message): Promise<Delivery> => {
-		const users = new Set([...listSubscribers(), deps.adminChatId]);
+		const users = new Set([...deps.repo.listSubscribers(), deps.adminChatId]);
 		const delivered = new Map();
 		for (const chatId of users) {
 			const messageId = await send(chatId, message);
@@ -119,14 +82,5 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		await send(deps.adminChatId, message);
 	};
 
-	return {
-		subscribe,
-		unsubscribe,
-		isSubscribed,
-		listSubscribers,
-		send,
-		notify,
-		notifyAdmin,
-		edit,
-	};
+	return { send, notify, notifyAdmin, edit };
 };

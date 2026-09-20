@@ -14,6 +14,10 @@ export type {
 	MessageId,
 } from "./model";
 export { escapeHtml } from "./model";
+export {
+	createSubscribersRepository,
+	type SubscribersRepository,
+} from "./repository";
 export { createTelegramService } from "./service";
 
 export const telegram = (bot: Bot) => {
