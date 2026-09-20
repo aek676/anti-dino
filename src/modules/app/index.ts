@@ -7,7 +7,6 @@ import { createSlotsRepository, createSlotsService } from "@/modules/slots";
 import {
 	createSubscribersRepository,
 	createTelegramService,
-	registerCommands,
 	telegram,
 } from "@/modules/telegram";
 import { watchdog } from "@/modules/watchdog";
@@ -31,13 +30,6 @@ const slotsService = createSlotsService({
 	send: telegramService.send,
 });
 
-registerCommands(bot, {
-	subscribe: subscribersRepository.subscribe,
-	unsubscribe: subscribersRepository.unsubscribe,
-	isSubscribed: subscribersRepository.isSubscribed,
-	sendSlots: slotsService.sendCurrent,
-});
-
 const app = new Elysia()
 	.use(
 		log.into({
@@ -58,7 +50,15 @@ const app = new Elysia()
 			edit: telegramService.edit,
 		}),
 	)
-	.use(telegram(bot))
+	.use(
+		telegram({
+			bot,
+			subscribe: subscribersRepository.subscribe,
+			unsubscribe: subscribersRepository.unsubscribe,
+			isSubscribed: subscribersRepository.isSubscribed,
+			sendSlots: slotsService.sendCurrent,
+		}),
+	)
 	.onStop(({ store }) => {
 		store.cron.watchdog.stop();
 		closeDatabase(db);

@@ -2,9 +2,7 @@ import { Elysia, status, t } from "elysia";
 import type { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { log } from "@/utils/logger";
-import { COMMANDS } from "./commands";
-
-export { registerCommands } from "./commands";
+import { COMMANDS, type CommandsDeps, registerCommands } from "./commands";
 
 export type {
 	ChatId,
@@ -20,7 +18,11 @@ export {
 } from "./repository";
 export { createTelegramService } from "./service";
 
-export const telegram = (bot: Bot) => {
+export type TelegramPluginDeps = { bot: Bot } & CommandsDeps;
+
+export const telegram = ({ bot, ...commands }: TelegramPluginDeps) => {
+	registerCommands(bot, commands);
+
 	return new Elysia({ name: "telegram" })
 		.onStart(async () => {
 			try {
