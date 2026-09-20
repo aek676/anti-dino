@@ -53,8 +53,8 @@ describe("slots service", () => {
 				message: {
 					text: [
 						"<b>🟢 2 slots available</b>",
-						"<b>Thu, Sep 17</b>\n<code>11:30</code>",
-						"<b>Fri, Sep 18</b>\n<code>10:00</code>",
+						"<b>Thu, Sep 17</b>\n11:30",
+						"<b>Fri, Sep 18</b>\n10:00",
 					].join("\n\n"),
 					buttons: bookButton,
 				},

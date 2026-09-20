@@ -26,9 +26,7 @@ const formatDays = (startTimes: string[], live: Set<string>): string[] =>
 			`<b>${formatDay(date)}</b>`,
 			daySlots
 				.map((slot) =>
-					live.has(slotKey(slot))
-						? `<code>${slot.time}</code>`
-						: `<s>${slot.time}</s>`,
+					live.has(slotKey(slot)) ? slot.time : `<s>${slot.time}</s>`,
 				)
 				.join("  "),
 		].join("\n"),
