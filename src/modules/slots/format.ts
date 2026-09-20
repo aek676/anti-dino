@@ -5,28 +5,17 @@ import { formatDay } from "@/utils/date";
 export const slotKey = (slot: FreshaModel["slot"]) =>
 	`${slot.date}T${slot.time}`;
 
-const byDateTime = (a: FreshaModel["slot"], b: FreshaModel["slot"]) =>
-	a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
-
-const toSlot = (startsAt: string): FreshaModel["slot"] => {
-	const [date = "", time = ""] = startsAt.split("T");
-	return { date, time };
-};
-
 const slotWord = (count: number) => (count === 1 ? "slot" : "slots");
 
 const formatDays = (startTimes: string[], live: Set<string>): string[] =>
 	Object.entries(
-		Object.groupBy(
-			startTimes.map(toSlot).toSorted(byDateTime),
-			(slot) => slot.date,
-		),
-	).map(([date, daySlots = []]) =>
+		Object.groupBy(startTimes.toSorted(), (key) => key.slice(0, 10)),
+	).map(([date, keys = []]) =>
 		[
 			`<b>${formatDay(date)}</b>`,
-			daySlots
-				.map((slot) =>
-					live.has(slotKey(slot)) ? slot.time : `<s>${slot.time}</s>`,
+			keys
+				.map((key) =>
+					live.has(key) ? key.slice(11) : `<s>${key.slice(11)}</s>`,
 				)
 				.join("  "),
 		].join("\n"),
