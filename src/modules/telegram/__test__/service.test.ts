@@ -212,12 +212,33 @@ describe("telegram service", () => {
 		expect(warn).not.toHaveBeenCalled();
 	});
 
-	test("edit logs and swallows any other failure", async () => {
-		const { bot } = fakeBot(new Set(), new Error("message can't be edited"));
+	test("edit logs any other failure and asks to be tried again", async () => {
+		const { bot } = fakeBot(new Set(), new Error("network down"));
 		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });
 
-		await service.edit(10, 5, { text: "new text" });
+		const edited = await service.edit(10, 5, { text: "new text" });
 
+		expect(edited).toBe(false);
+		expect(warn).toHaveBeenCalledTimes(1);
+	});
+
+	test("edit gives up on a message Telegram will never let it edit", async () => {
+		const notFound = new GrammyError(
+			"Call to 'editMessageText' failed!",
+			{
+				ok: false,
+				error_code: 400,
+				description: "Bad Request: message to edit not found",
+			},
+			"editMessageText",
+			{},
+		);
+		const { bot } = fakeBot(new Set(), notFound);
+		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });
+
+		const edited = await service.edit(10, 5, { text: "new text" });
+
+		expect(edited).toBe(true);
 		expect(warn).toHaveBeenCalledTimes(1);
 	});
 

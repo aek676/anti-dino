@@ -27,7 +27,7 @@ export type WatchdogDeps = {
 		chatId: ChatId,
 		messageId: MessageId,
 		message: Message,
-	) => Promise<void>;
+	) => Promise<boolean>;
 	now?: () => Temporal.Instant;
 	sleep?: Sleep;
 };
@@ -178,13 +178,13 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		const goneStartTimes = [...known].filter((key) => !current.has(key));
 
-		const affected = repo.listAlertMessages(target, goneStartTimes);
+		const affected = repo.listAlertMessagesToEdit(target, goneStartTimes);
 
 		repo.deleteSlots(target, goneStartTimes);
 
 		const live = new Set(current.keys());
 		for (const { chatId, messageId } of affected) {
-			await deps.edit(
+			const edited = await deps.edit(
 				chatId,
 				messageId,
 				formatUpdatedMessage(
@@ -193,6 +193,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 					ENV.FRESHA_BOOKING_URL,
 				),
 			);
+			repo.markAlertStale(chatId, messageId, !edited);
 		}
 
 		if (newSlots.length > 0) {
