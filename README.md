@@ -23,6 +23,49 @@ bunx varlock load   # asks for the Bitwarden token once, then validates and mask
 bun run dev
 ```
 
+### Tunnel for the Telegram webhook
+
+The bot receives updates over a webhook, so Telegram needs a public HTTPS URL
+that reaches your machine. On startup the app registers
+`PUBLIC_URL + WEBHOOK_PATH` with Telegram, which means the tunnel has to be up
+and `PUBLIC_URL` set before `bun run dev`. Run each in its own terminal so the
+logs stay apart.
+
+The default is a [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+quick tunnel, which needs no account and no domain:
+
+```bash
+# terminal 1
+cloudflared tunnel --url http://localhost:3000
+```
+
+It prints a `https://<random-words>.trycloudflare.com` URL. Put it in
+`.env.local` as `PUBLIC_URL` (no trailing slash), then:
+
+```bash
+# terminal 2
+bun run dev
+```
+
+The URL changes every time cloudflared restarts, so update `PUBLIC_URL` and
+restart the dev server when it does; leaving the tunnel running between dev
+restarts avoids that. If `setWebhook` fails with "Failed to resolve host", the
+new hostname has not propagated yet: wait a few seconds and save any file to
+trigger a reload.
+
+That is all you need. Optionally, if you have a domain in Cloudflare, a named
+tunnel gives you a fixed URL so `PUBLIC_URL` is set once:
+
+```bash
+cloudflared tunnel login
+cloudflared tunnel create anti-dino-dev
+cloudflared tunnel route dns anti-dino-dev anti-dino-dev.<your-domain>
+cloudflared tunnel run --url http://localhost:3000 anti-dino-dev
+```
+
+Any other tunnel (ngrok, Tailscale Funnel) works the same way, as long as it
+gives you an HTTPS URL that forwards to port 3000.
+
 The token never sits on disk in plaintext: Varlock swaps the `varlock(prompt)`
 placeholder in `.env.local` for a `varlock(local:...)` value encrypted for your
 machine, so it is useless anywhere else and unreadable to tools that open the
