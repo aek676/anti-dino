@@ -3,17 +3,31 @@ import { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
-import { createTelegramService, telegram } from "@/modules/telegram";
+import { createSlotsRepository, createSlotsService } from "@/modules/slots";
+import {
+	createSubscribersRepository,
+	createTelegramService,
+	telegram,
+} from "@/modules/telegram";
 import { watchdog } from "@/modules/watchdog";
 import { closeDatabase, db } from "@/utils/db";
 import { log } from "@/utils/logger";
 
 const bot = new Bot(ENV.TELEGRAM_BOT_TOKEN);
 
+const subscribersRepository = createSubscribersRepository(db);
+
 const telegramService = createTelegramService({
-	db,
+	repo: subscribersRepository,
 	bot,
 	adminChatId: ENV.ADMIN_CHAT_ID,
+});
+
+const slotsRepository = createSlotsRepository(db);
+
+const slotsService = createSlotsService({
+	repo: slotsRepository,
+	send: telegramService.send,
 });
 
 const app = new Elysia()
@@ -27,7 +41,7 @@ const app = new Elysia()
 	.use(fresha())
 	.use(
 		watchdog({
-			db,
+			repo: slotsRepository,
 			fresha: createFreshaService(fetch, {
 				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
 			}),
@@ -36,7 +50,15 @@ const app = new Elysia()
 			edit: telegramService.edit,
 		}),
 	)
-	.use(telegram(bot))
+	.use(
+		telegram({
+			bot,
+			subscribe: subscribersRepository.subscribe,
+			unsubscribe: subscribersRepository.unsubscribe,
+			isSubscribed: subscribersRepository.isSubscribed,
+			sendSlots: slotsService.sendCurrent,
+		}),
+	)
 	.onStop(({ store }) => {
 		store.cron.watchdog.stop();
 		closeDatabase(db);

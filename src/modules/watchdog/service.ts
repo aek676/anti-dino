@@ -1,9 +1,12 @@
 import { ENV } from "varlock/env";
+import { FreshaError, type FreshaService } from "@/modules/fresha";
 import {
-	type createFreshaService,
-	FreshaError,
-	type FreshaModel,
-} from "@/modules/fresha";
+	formatNewSlotsMessage,
+	formatUpdatedMessage,
+	type SlotsRepository,
+	slotKey,
+	watchTarget,
+} from "@/modules/slots";
 import {
 	type ChatId,
 	type Delivery,
@@ -11,15 +14,13 @@ import {
 	type Message,
 	type MessageId,
 } from "@/modules/telegram";
-import { formatDay, formatWallClock } from "@/utils/date";
-import type { Db } from "@/utils/db";
+import { formatWallClock } from "@/utils/date";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
-import { createWatchdogRepository, type WatchTarget } from "./repository";
 
 export type WatchdogDeps = {
-	db: Db;
-	fresha: Pick<ReturnType<typeof createFreshaService>, "listSlots">;
+	repo: SlotsRepository;
+	fresha: Pick<FreshaService, "listSlots">;
 	notify: (message: Message) => Promise<Delivery>;
 	notifyAdmin: (message: Message) => Promise<void>;
 	edit: (
@@ -60,80 +61,13 @@ export const retry = async <T>(
 	return lastError;
 };
 
-const slotKey = (slot: FreshaModel["slot"]) => `${slot.date}T${slot.time}`;
-
-const byDateTime = (a: FreshaModel["slot"], b: FreshaModel["slot"]) =>
-	a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
-
-const toSlot = (startsAt: string): FreshaModel["slot"] => {
-	const [date = "", time = ""] = startsAt.split("T");
-	return { date, time };
-};
-
-const slotWord = (count: number) => (count === 1 ? "slot" : "slots");
-
-const formatDays = (startTimes: string[], live: Set<string>): string[] =>
-	Object.entries(
-		Object.groupBy(
-			startTimes.map(toSlot).toSorted(byDateTime),
-			(slot) => slot.date,
-		),
-	).map(([date, daySlots = []]) =>
-		[
-			`<b>${formatDay(date)}</b>`,
-			daySlots
-				.map((slot) =>
-					live.has(slotKey(slot))
-						? `<code>${slot.time}</code>`
-						: `<s>${slot.time}</s>`,
-				)
-				.join("  "),
-		].join("\n"),
-	);
-
-const formatAlert = (
-	header: string,
-	startTimes: string[],
-	live: Set<string>,
-	bookingUrl: string,
-): Message => ({
-	text: [`<b>${header}</b>`, ...formatDays(startTimes, live)].join("\n\n"),
-	buttons: startTimes.some((key) => live.has(key))
-		? [[{ label: "Book on Fresha", url: bookingUrl }]]
-		: [],
-});
-
-const formatNewSlotsMessage = (
-	startTimes: string[],
-	bookingUrl: string,
-): Message =>
-	formatAlert(
-		`🟢 ${startTimes.length} new ${slotWord(startTimes.length)}`,
-		startTimes,
-		new Set(startTimes),
-		bookingUrl,
-	);
-
-const formatUpdatedMessage = (
-	startTimes: string[],
-	live: Set<string>,
-	bookingUrl: string,
-): Message => {
-	const remaining = startTimes.filter((key) => live.has(key)).length;
-	const header =
-		remaining > 0
-			? `🟡 ${remaining} of ${startTimes.length} ${slotWord(startTimes.length)} left`
-			: "⚪ No slots left from this alert";
-
-	return formatAlert(header, startTimes, live, bookingUrl);
-};
-
 export type CheckResult =
 	| { ok: true; newSlots: string[]; goneSlots: string[] }
 	| { ok: false; skipped?: true };
 
 export const createWatchdogService = (deps: WatchdogDeps) => {
-	const repo = createWatchdogRepository(deps.db);
+	const { repo } = deps;
+	const target = watchTarget();
 	let failures = 0;
 	let skipTicks = 0;
 	let skipUntil: Temporal.Instant | null = null;
@@ -219,11 +153,6 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			log.info({ skipTicks }, "watchdog check skipped after a 429");
 			return { ok: false, skipped: true };
 		}
-
-		const target: WatchTarget = {
-			employeeId: String(ENV.FRESHA_EMPLOYEE_ID),
-			serviceId: ENV.FRESHA_SERVICE_ID,
-		};
 
 		const slots = await retry(
 			() =>

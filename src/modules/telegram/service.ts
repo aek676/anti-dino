@@ -1,10 +1,10 @@
 import { type Bot, GrammyError, InlineKeyboard } from "grammy";
-import type { Db } from "@/utils/db";
 import { log } from "@/utils/logger";
 import type { ChatId, Delivery, Message, MessageId } from "./model";
+import type { SubscribersRepository } from "./repository";
 
 export type TelegramDeps = {
-	db: Db;
+	repo: Pick<SubscribersRepository, "listSubscribers">;
 	adminChatId: number;
 	bot: Bot;
 };
@@ -20,30 +20,6 @@ const toOptions = ({ buttons = [] }: Message) => ({
 });
 
 export const createTelegramService = (deps: TelegramDeps) => {
-	const subscribe = (chatId: number) => {
-		const query = deps.db.query<void, { chatId: number; createdAt: string }>(
-			`INSERT OR IGNORE INTO subscribers (chat_id, created_at) VALUES (:chatId, :createdAt)`,
-		);
-		query.run({
-			chatId,
-			createdAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
-		});
-	};
-
-	const unsubscribe = (chatId: number) => {
-		const query = deps.db.query<void, { chatId: number }>(
-			`DELETE FROM subscribers WHERE chat_id = :chatId`,
-		);
-		query.run({ chatId });
-	};
-
-	const listSubscribers = () => {
-		const query = deps.db.query<{ chat_id: number }, []>(
-			`SELECT chat_id FROM subscribers`,
-		);
-		return query.all().map((row) => row.chat_id);
-	};
-
 	const edit = async (
 		chatId: ChatId,
 		messageId: MessageId,
@@ -70,23 +46,28 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		}
 	};
 
+	const send = async (
+		chatId: ChatId,
+		message: Message,
+	): Promise<MessageId | undefined> => {
+		try {
+			const { message_id } = await deps.bot.api.sendMessage(
+				chatId,
+				message.text,
+				toOptions(message),
+			);
+			return message_id;
+		} catch (error) {
+			log.warn({ chatId, err: error }, "Failed to send message");
+		}
+	};
+
 	const notify = async (message: Message): Promise<Delivery> => {
-		const users = new Set([...listSubscribers(), deps.adminChatId]);
+		const users = new Set([...deps.repo.listSubscribers(), deps.adminChatId]);
 		const delivered = new Map();
 		for (const chatId of users) {
-			try {
-				const { message_id } = await deps.bot.api.sendMessage(
-					chatId,
-					message.text,
-					toOptions(message),
-				);
-				delivered.set(chatId, message_id);
-			} catch (error) {
-				log.warn(
-					{ chatId, err: error },
-					"Failed to send message to subscriber",
-				);
-			}
+			const messageId = await send(chatId, message);
+			if (messageId !== undefined) delivered.set(chatId, messageId);
 		}
 
 		if (users.size > 0 && delivered.size <= 0)
@@ -98,26 +79,8 @@ export const createTelegramService = (deps: TelegramDeps) => {
 	};
 
 	const notifyAdmin = async (message: Message) => {
-		try {
-			await deps.bot.api.sendMessage(
-				deps.adminChatId,
-				message.text,
-				toOptions(message),
-			);
-		} catch (error) {
-			log.warn({ err: error }, "Failed to send message to the admin");
-		}
+		await send(deps.adminChatId, message);
 	};
 
-	deps.bot.command("start", (ctx) => {
-		subscribe(ctx.chatId);
-		return ctx.reply("You have subscribed to notifications.");
-	});
-
-	deps.bot.command("stop", (ctx) => {
-		unsubscribe(ctx.chatId);
-		return ctx.reply("You have unsubscribed from notifications.");
-	});
-
-	return { subscribe, unsubscribe, listSubscribers, notify, notifyAdmin, edit };
+	return { send, notify, notifyAdmin, edit };
 };

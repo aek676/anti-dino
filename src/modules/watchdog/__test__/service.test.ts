@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ENV } from "varlock/env";
 import { FreshaError, type FreshaModel } from "@/modules/fresha";
+import { createSlotsRepository } from "@/modules/slots";
 import type { Message } from "@/modules/telegram";
 import { type Db, openDatabase } from "@/utils/db";
 import { createWatchdogService, retry } from "../service";
@@ -136,7 +137,7 @@ describe("check", () => {
 		listSlots: () => Promise<Slot[] | FreshaError>;
 	}) =>
 		createWatchdogService({
-			db,
+			repo: createSlotsRepository(db),
 			fresha,
 			notify,
 			notifyAdmin,
@@ -177,10 +178,9 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(1);
 		expect(sent[0]).toEqual({
-			text: [
-				"<b>🟢 2 new slots</b>",
-				"<b>Thu, Sep 17</b>\n<code>11:30</code>  <code>11:45</code>",
-			].join("\n\n"),
+			text: ["<b>🟢 2 new slots</b>", "<b>Thu, Sep 17</b>\n11:30  11:45"].join(
+				"\n\n",
+			),
 			buttons: bookButton,
 		});
 		expect(countSlots()).toBe(2);
@@ -197,8 +197,8 @@ describe("check", () => {
 		expect(sent[0]?.text).toBe(
 			[
 				"<b>🟢 3 new slots</b>",
-				"<b>Thu, Sep 17</b>\n<code>11:30</code>  <code>11:45</code>",
-				"<b>Fri, Sep 18</b>\n<code>10:00</code>",
+				"<b>Thu, Sep 17</b>\n11:30  11:45",
+				"<b>Fri, Sep 18</b>\n10:00",
 			].join("\n\n"),
 		);
 	});
@@ -226,7 +226,7 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(2);
 		expect(sent[1]?.text).toContain("<b>🟢 1 new slot</b>");
-		expect(sent[1]?.text).toContain("<b>Fri, Sep 18</b>\n<code>10:00</code>");
+		expect(sent[1]?.text).toContain("<b>Fri, Sep 18</b>\n10:00");
 		expect(sent[1]?.text).not.toContain("11:30");
 		expect(countSlots()).toBe(3);
 	});
@@ -247,7 +247,7 @@ describe("check", () => {
 		expect(edited[0]?.message).toEqual({
 			text: [
 				"<b>🟡 1 of 2 slots left</b>",
-				"<b>Thu, Sep 17</b>\n<s>11:30</s>  <code>11:45</code>",
+				"<b>Thu, Sep 17</b>\n<s>11:30</s>  11:45",
 			].join("\n\n"),
 			buttons: bookButton,
 		});
@@ -359,7 +359,7 @@ describe("check", () => {
 		expect(sent[1]).toEqual({
 			text: `Fresha OK again after ${threshold + 1} failed checks`,
 		});
-		expect(sent[2]?.text).toContain("<b>Thu, Sep 17</b>\n<code>11:30</code>");
+		expect(sent[2]?.text).toContain("<b>Thu, Sep 17</b>\n11:30");
 	});
 
 	test("a short failure streak recovers without any message", async () => {
@@ -484,7 +484,7 @@ describe("check", () => {
 	test("does not persist when notify fails, so the next run alerts again", async () => {
 		const fresha = fake([slotA]);
 		const broken = createWatchdogService({
-			db,
+			repo: createSlotsRepository(db),
 			fresha,
 			now,
 			sleep,

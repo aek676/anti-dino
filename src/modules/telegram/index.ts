@@ -2,6 +2,7 @@ import { Elysia, status, t } from "elysia";
 import type { Bot } from "grammy";
 import { ENV } from "varlock/env";
 import { log } from "@/utils/logger";
+import { COMMANDS, type CommandsDeps, registerCommands } from "./commands";
 
 export type {
 	ChatId,
@@ -11,13 +12,22 @@ export type {
 	MessageId,
 } from "./model";
 export { escapeHtml } from "./model";
+export {
+	createSubscribersRepository,
+	type SubscribersRepository,
+} from "./repository";
 export { createTelegramService } from "./service";
 
-export const telegram = (bot: Bot) => {
+export type TelegramPluginDeps = { bot: Bot } & CommandsDeps;
+
+export const telegram = ({ bot, ...commands }: TelegramPluginDeps) => {
+	registerCommands(bot, commands);
+
 	return new Elysia({ name: "telegram" })
 		.onStart(async () => {
 			try {
 				await bot.init();
+				await bot.api.setMyCommands(COMMANDS);
 				await bot.api.setWebhook(ENV.PUBLIC_URL + ENV.WEBHOOK_PATH, {
 					secret_token: ENV.TELEGRAM_WEBHOOK_SECRET,
 				});
