@@ -84,7 +84,6 @@ export const createSlotsRepository = (db: Db) => {
 		},
 	);
 
-	// The messages that announced one of these slots, plus the ones whose last edit failed.
 	const listAlertMessagesToEdit = (
 		target: WatchTarget,
 		startTimes: string[],
