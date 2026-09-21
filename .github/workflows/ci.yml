@@ -143,7 +143,9 @@ jobs:
   cd:
     name: CD
     needs: ci
-    if: github.event_name == 'push'
+    # reviewdog is skipped on push, and a skipped ancestor skips this job too
+    # unless the condition calls a status function.
+    if: ${{ !cancelled() && needs.ci.result == 'success' && github.event_name == 'push' }}
     permissions:
       contents: read
       packages: write
