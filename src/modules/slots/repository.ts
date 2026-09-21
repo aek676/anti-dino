@@ -34,7 +34,14 @@ export const createSlotsRepository = (db: Db) => {
 	>(
 		`SELECT DISTINCT chat_id, message_id FROM alerts
 		 WHERE employee_id = :employeeId AND service_id = :serviceId
-		   AND starts_at IN (SELECT value FROM json_each(:startTimes))`,
+		   AND (stale = 1 OR starts_at IN (SELECT value FROM json_each(:startTimes)))`,
+	);
+
+	const updateAlertStale = db.query<
+		void,
+		{ chatId: ChatId; messageId: MessageId; stale: number }
+	>(
+		"UPDATE alerts SET stale = :stale WHERE chat_id = :chatId AND message_id = :messageId",
 	);
 
 	const selectAlertStartTimes = db.query<
@@ -77,15 +84,20 @@ export const createSlotsRepository = (db: Db) => {
 		},
 	);
 
-	const listAlertMessages = (
+	const listAlertMessagesToEdit = (
 		target: WatchTarget,
 		startTimes: string[],
-	): { chatId: ChatId; messageId: MessageId }[] => {
-		if (startTimes.length === 0) return [];
-
-		return selectAlertMessages
+	): { chatId: ChatId; messageId: MessageId }[] =>
+		selectAlertMessages
 			.all({ ...target, startTimes: JSON.stringify(startTimes) })
 			.map((row) => ({ chatId: row.chat_id, messageId: row.message_id }));
+
+	const markAlertStale = (
+		chatId: ChatId,
+		messageId: MessageId,
+		stale: boolean,
+	) => {
+		updateAlertStale.run({ chatId, messageId, stale: stale ? 1 : 0 });
 	};
 
 	const listAlertStartTimes = (
@@ -105,7 +117,8 @@ export const createSlotsRepository = (db: Db) => {
 		insertSlots,
 		deleteSlots,
 		insertAlerts,
-		listAlertMessages,
+		listAlertMessagesToEdit,
+		markAlertStale,
 		listAlertStartTimes,
 		deleteAlertsBefore,
 	};

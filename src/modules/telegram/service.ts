@@ -9,6 +9,12 @@ export type TelegramDeps = {
 	bot: Bot;
 };
 
+// Telegram sends 400 when the message or chat is gone and 403 when the bot is blocked.
+const PERMANENT_ERROR_CODES = new Set([400, 403]);
+
+const isPermanent = (error: unknown) =>
+	error instanceof GrammyError && PERMANENT_ERROR_CODES.has(error.error_code);
+
 const toOptions = ({ buttons = [] }: Message) => ({
 	parse_mode: "HTML" as const,
 	link_preview_options: { is_disabled: true },
@@ -24,7 +30,7 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		chatId: ChatId,
 		messageId: MessageId,
 		message: Message,
-	) => {
+	): Promise<boolean> => {
 		try {
 			await deps.bot.api.editMessageText(
 				chatId,
@@ -32,17 +38,19 @@ export const createTelegramService = (deps: TelegramDeps) => {
 				message.text,
 				toOptions(message),
 			);
+			return true;
 		} catch (error) {
 			if (
 				error instanceof GrammyError &&
 				error.description.includes("message is not modified")
 			)
-				return;
+				return true;
 
 			log.warn(
 				{ chatId, message: messageId, err: error },
 				"Failed to edit message",
 			);
+			return isPermanent(error);
 		}
 	};
 

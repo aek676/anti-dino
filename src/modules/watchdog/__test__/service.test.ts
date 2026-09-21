@@ -125,9 +125,11 @@ describe("check", () => {
 		sentToAdmin.push(message.text);
 		return Promise.resolve();
 	};
+	let editFails: boolean;
 	const edit = (chatId: number, messageId: number, message: Message) => {
+		if (editFails) return Promise.resolve(false);
 		edited.push({ chatId, messageId, message });
-		return Promise.resolve();
+		return Promise.resolve(true);
 	};
 	const sleep = () => Promise.resolve();
 	let clock: Temporal.Instant;
@@ -162,6 +164,7 @@ describe("check", () => {
 		sent = [];
 		sentToAdmin = [];
 		edited = [];
+		editFails = false;
 		clock = Temporal.Instant.from("2026-09-14T10:00:00Z");
 	});
 	afterEach(() => {
@@ -283,6 +286,40 @@ describe("check", () => {
 		await watchdog.check();
 
 		expect(edited).toEqual([]);
+	});
+
+	test("edits a message again when the edit failed", async () => {
+		await service(fake([slotA, slotB])).check();
+
+		editFails = true;
+		const failed = await service(fake([slotB])).check();
+		editFails = false;
+		await service(fake([slotB])).check();
+		await service(fake([slotB])).check();
+
+		expect(failed).toEqual({
+			ok: true,
+			newSlots: [],
+			goneSlots: ["2026-09-17T11:30"],
+		});
+		expect(edited.map((call) => call.messageId)).toEqual([1]);
+	});
+
+	test("still announces a slot that comes back while an edit is pending", async () => {
+		await service(fake([slotA, slotB])).check();
+		editFails = true;
+		await service(fake([slotB])).check();
+		editFails = false;
+
+		const back = await service(fake([slotA, slotB])).check();
+
+		expect(back).toEqual({
+			ok: true,
+			newSlots: ["2026-09-17T11:30"],
+			goneSlots: [],
+		});
+		expect(sent).toHaveLength(2);
+		expect(edited.map((call) => call.messageId)).toEqual([1]);
 	});
 
 	test("restores a slot that comes back", async () => {

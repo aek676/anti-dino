@@ -68,7 +68,7 @@ describe("slots service", () => {
 		await service().sendCurrent(7);
 
 		const repo = createSlotsRepository(db);
-		expect(repo.listAlertMessages(target, ["2026-09-17T11:30"])).toEqual([
+		expect(repo.listAlertMessagesToEdit(target, ["2026-09-17T11:30"])).toEqual([
 			{ chatId: 7, messageId: MESSAGE_ID },
 		]);
 		expect(repo.listAlertStartTimes(7, MESSAGE_ID)).toEqual([
@@ -84,7 +84,9 @@ describe("slots service", () => {
 		await service().sendCurrent(7);
 
 		expect(
-			createSlotsRepository(db).listAlertMessages(target, ["2026-09-17T11:30"]),
+			createSlotsRepository(db).listAlertMessagesToEdit(target, [
+				"2026-09-17T11:30",
+			]),
 		).toEqual([]);
 	});
 
