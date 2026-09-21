@@ -56,7 +56,8 @@
 					"options": {
 						"paths": {
 							"pino": "Use the shared logger from @/utils/logger.",
-							"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+							"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
+							"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db."
 						},
 						"patterns": [
 							{
@@ -156,7 +157,8 @@
 							"options": {
 								"paths": {
 									"pino": "Use the shared logger from @/utils/logger.",
-									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
+									"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db."
 								},
 								"patterns": [
 									{
@@ -188,7 +190,8 @@
 							"options": {
 								"paths": {
 									"pino": "Use the shared logger from @/utils/logger.",
-									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
+									"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db."
 								},
 								"patterns": [
 									{
@@ -220,7 +223,8 @@
 							"options": {
 								"paths": {
 									"pino": "Use the shared logger from @/utils/logger.",
-									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
+									"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db."
 								},
 								"patterns": [
 									{
@@ -252,6 +256,43 @@
 				"rules": {
 					"style": {
 						"noRestrictedImports": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/utils/db/index.ts", "src/utils/db/types.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"pino": "Use the shared logger from @/utils/logger.",
+									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+								},
+								"patterns": [
+									{
+										"group": ["@/modules/*"],
+										"importNamePattern": "create[A-Z].*",
+										"message": "Don't build another module's service or repository here: create it in @/modules/app and receive it through deps (import its type instead)."
+									},
+									{
+										"group": ["@/modules/*/**"],
+										"message": "Import a module only through its index (@/modules/<name>); use relative paths inside the module."
+									},
+									{
+										"group": ["@/*"],
+										"message": "Don't import loose files from the src/ root: put shared code in @/utils and feature code in @/modules."
+									},
+									{
+										"group": ["../**"],
+										"message": "Use the @/ alias instead of relative imports that leave the current directory."
+									}
+								]
+							}
+						}
 					}
 				}
 			}
