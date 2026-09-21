@@ -6,19 +6,33 @@ export type SlotsRepository = ReturnType<typeof createSlotsRepository>;
 
 export const createSlotsRepository = (db: Db) => {
 	const selectSlotStartTimes = db.query<{ starts_at: string }, WatchTarget>(
-		"SELECT starts_at FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId ORDER BY starts_at",
+		"SELECT starts_at FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId AND gone_at IS NULL ORDER BY starts_at",
 	);
 
 	const insertSlot = db.query<
 		void,
 		WatchTarget & { startsAt: string; seenAt: string }
 	>(
-		`INSERT OR IGNORE INTO slots (employee_id, service_id, starts_at, seen_at)
-		 VALUES (:employeeId, :serviceId, :startsAt, :seenAt)`,
+		`INSERT OR IGNORE INTO slots (employee_id, service_id, starts_at, seen_at, last_seen_at)
+		 VALUES (:employeeId, :serviceId, :startsAt, :seenAt, :seenAt)`,
 	);
 
-	const deleteSlot = db.query<void, WatchTarget & { startsAt: string }>(
-		`DELETE FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId AND starts_at = :startsAt`,
+	const updateSlotsGone = db.query<
+		void,
+		WatchTarget & { goneStartTimes: string; seenAt: string }
+	>(
+		`UPDATE slots SET gone_at = :seenAt
+		 WHERE employee_id = :employeeId AND service_id = :serviceId AND gone_at IS NULL
+		   AND starts_at IN (SELECT value FROM json_each(:goneStartTimes))`,
+	);
+
+	const updateSlotsLastSeen = db.query<
+		void,
+		WatchTarget & { goneStartTimes: string; seenAt: string }
+	>(
+		`UPDATE slots SET last_seen_at = :seenAt
+		 WHERE employee_id = :employeeId AND service_id = :serviceId AND gone_at IS NULL
+		   AND starts_at NOT IN (SELECT value FROM json_each(:goneStartTimes))`,
 	);
 
 	const insertAlert = db.query<
@@ -66,11 +80,15 @@ export const createSlotsRepository = (db: Db) => {
 		},
 	);
 
-	const deleteSlots = db.transaction(
-		(target: WatchTarget, startTimes: string[]) => {
-			for (const startsAt of startTimes) {
-				deleteSlot.run({ ...target, startsAt });
-			}
+	const reconcileKnownSlots = db.transaction(
+		(target: WatchTarget, goneStartTimes: string[], seenAt: string) => {
+			const params = {
+				...target,
+				goneStartTimes: JSON.stringify(goneStartTimes),
+				seenAt,
+			};
+			updateSlotsGone.run(params);
+			updateSlotsLastSeen.run(params);
 		},
 	);
 
@@ -115,7 +133,7 @@ export const createSlotsRepository = (db: Db) => {
 	return {
 		listSlotStartTimes,
 		insertSlots,
-		deleteSlots,
+		reconcileKnownSlots,
 		insertAlerts,
 		listAlertMessagesToEdit,
 		markAlertStale,
