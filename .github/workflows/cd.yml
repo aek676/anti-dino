@@ -1,0 +1,123 @@
+name: CD
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Leave empty, CI deploys the commit it just checked.
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: >-
+          Full SHA of an already published commit to roll back to. Skips the
+          publish job and deploys its sha-xxxxxxx image.
+        required: true
+        type: string
+
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish image
+    if: inputs.ref == ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to the VM
+    needs: publish
+    if: ${{ !cancelled() && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+      DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup toolchain (mise)
+        uses: jdx/mise-action@v4
+
+      - name: Get Bun cache dir
+        id: bun-cache-dir
+        run: echo "dir=$(bun pm cache)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Bun cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ steps.bun-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun ci
+
+      # Fails here on a missing or invalid value, before the VM is touched.
+      - name: Resolve the production env
+        env:
+          NODE_ENV: production
+          BITWARDEN_ACCESS_TOKEN: ${{ secrets.BITWARDEN_ACCESS_TOKEN }}
+        run: |
+          umask 077
+          bunx varlock load --format json-full --compact > deploy/varlock-env.json
+
+      - name: Configure SSH for the VM
+        uses: shimataro/ssh-key-action@v2.8.1
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          known_hosts: ${{ vars.DEPLOY_SSH_KNOWN_HOSTS }}
+
+      - name: Sync deploy scaffold to VM
+        run: bash .github/scripts/sync-deploy-scaffold.sh
+
+      - name: Deploy
+        run: sh .github/scripts/deploy.sh
+
+      - name: Wait for the app to answer
+        run: |
+          url="$(jq -r '.config.PUBLIC_URL.value' deploy/varlock-env.json)"
+          curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors "$url/healthz"

@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -139,3 +139,13 @@ jobs:
       - name: Fail if any required job failed
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
+
+  cd:
+    name: CD
+    needs: ci
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit
+    uses: ./.github/workflows/cd.yml

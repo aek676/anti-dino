@@ -1,0 +1,24 @@
+services:
+  app:
+    image: ghcr.io/aek676/anti-dino:${IMAGE_TAG:?deploy-on-host.sh sets this}
+    restart: unless-stopped
+    expose:
+      - 3000
+    environment:
+      __VARLOCK_ENV: ${__VARLOCK_ENV:?deploy-on-host.sh reads it from varlock-env.json}
+    volumes:
+      - anti-dino-data:/app/data
+    networks:
+      - appnet
+    labels:
+      caddy: anti-dino.aek676.duckdns.org
+      caddy.reverse_proxy: "{{upstreams 3000}}"
+
+volumes:
+  anti-dino-data:
+    name: anti-dino-data
+
+networks:
+  appnet:
+    external: true
+    name: appnet
