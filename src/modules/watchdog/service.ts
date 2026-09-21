@@ -180,7 +180,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		const affected = repo.listAlertMessagesToEdit(target, goneStartTimes);
 
-		repo.deleteSlots(target, goneStartTimes);
+		repo.reconcileKnownSlots(target, goneStartTimes, seenAt);
 
 		const live = new Set(current.keys());
 		for (const { chatId, messageId } of affected) {

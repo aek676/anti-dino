@@ -151,9 +151,24 @@ describe("check", () => {
 	const countSlots = () =>
 		db
 			.query<{ n: number }, [string, string]>(
-				"SELECT COUNT(*) AS n FROM slots WHERE employee_id = ? AND service_id = ?",
+				"SELECT COUNT(*) AS n FROM slots WHERE employee_id = ? AND service_id = ? AND gone_at IS NULL",
 			)
 			.get(employeeId, serviceId)?.n ?? 0;
+
+	const history = () =>
+		db
+			.query<
+				{
+					starts_at: string;
+					seen_at: string;
+					last_seen_at: string;
+					gone_at: string | null;
+				},
+				[]
+			>(
+				"SELECT starts_at, seen_at, last_seen_at, gone_at FROM slots ORDER BY starts_at, seen_at",
+			)
+			.all();
 
 	const countAlerts = () =>
 		db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM alerts").get()?.n ??
@@ -544,9 +559,10 @@ describe("check", () => {
 		expect(countSlots()).toBe(1);
 	});
 
-	test("forgets a slot that disappears", async () => {
+	test("keeps a slot that disappears as history", async () => {
 		await service(fake([slotA, slotB])).check();
 
+		clock = clock.add({ minutes: 5 });
 		const result = await service(fake([slotA])).check();
 
 		expect(result).toEqual({
@@ -556,6 +572,20 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(1);
 		expect(countSlots()).toBe(1);
+		expect(history()).toEqual([
+			{
+				starts_at: "2026-09-17T11:30",
+				seen_at: "2026-09-14T10:00:00.000Z",
+				last_seen_at: "2026-09-14T10:05:00.000Z",
+				gone_at: null,
+			},
+			{
+				starts_at: "2026-09-17T11:45",
+				seen_at: "2026-09-14T10:00:00.000Z",
+				last_seen_at: "2026-09-14T10:00:00.000Z",
+				gone_at: "2026-09-14T10:05:00.000Z",
+			},
+		]);
 	});
 
 	test("escapes the Fresha error in the failure alert", async () => {
@@ -568,8 +598,10 @@ describe("check", () => {
 
 	test("reports a slot again when it comes back", async () => {
 		await service(fake([slotA, slotB])).check();
+		clock = clock.add({ minutes: 5 });
 		await service(fake([slotA])).check();
 
+		clock = clock.add({ minutes: 5 });
 		const result = await service(fake([slotA, slotB])).check();
 
 		expect(result).toEqual({
@@ -579,18 +611,28 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(2);
 		expect(countSlots()).toBe(2);
+		expect(
+			history()
+				.filter((row) => row.starts_at === "2026-09-17T11:45")
+				.map((row) => [row.seen_at, row.gone_at]),
+		).toEqual([
+			["2026-09-14T10:00:00.000Z", "2026-09-14T10:05:00.000Z"],
+			["2026-09-14T10:10:00.000Z", null],
+		]);
 	});
 
 	test("keeps the table untouched when Fresha fails", async () => {
 		await service(fake([slotA])).check();
+		const before = history();
 
+		clock = clock.add({ minutes: 5 });
 		const result = await service(failing()).check();
 
 		expect(result).toEqual({ ok: false });
-		expect(countSlots()).toBe(1);
+		expect(history()).toEqual(before);
 	});
 
-	test("empties the table when nothing is free", async () => {
+	test("leaves no live slot when nothing is free", async () => {
 		await service(fake([slotA, slotB])).check();
 
 		const result = await service(fake([])).check();
