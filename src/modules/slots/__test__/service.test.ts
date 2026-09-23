@@ -18,6 +18,8 @@ describe("slots service", () => {
 	const bookButton = [
 		[{ label: "Book on Fresha", url: ENV.FRESHA_BOOKING_URL }],
 	];
+	const link = (key: string) =>
+		`<a href="${ENV.PUBLIC_URL}/book/${key}">${key.slice(11)}</a>`;
 
 	const service = () =>
 		createSlotsService({
@@ -53,8 +55,8 @@ describe("slots service", () => {
 				message: {
 					text: [
 						"<b>🟢 2 slots available</b>",
-						"<b>Thu, Sep 17</b>\n11:30",
-						"<b>Fri, Sep 18</b>\n10:00",
+						`<b>Thu, Sep 17</b>\n${link("2026-09-17T11:30")}`,
+						`<b>Fri, Sep 18</b>\n${link("2026-09-18T10:00")}`,
 					].join("\n\n"),
 					buttons: bookButton,
 				},

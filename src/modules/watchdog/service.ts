@@ -1,6 +1,7 @@
 import { ENV } from "varlock/env";
 import { FreshaError, type FreshaService } from "@/modules/fresha";
 import {
+	bookingLinks,
 	formatNewSlotsMessage,
 	formatUpdatedMessage,
 	type SlotsRepository,
@@ -161,6 +162,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		repo.reconcileKnownSlots(target, goneStartTimes, seenAt);
 
 		const live = new Set(current.keys());
+		const links = bookingLinks();
 		for (const { chatId, messageId } of affected) {
 			const edited = await deps.edit(
 				chatId,
@@ -168,7 +170,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 				formatUpdatedMessage(
 					repo.listAlertStartTimes(chatId, messageId),
 					live,
-					ENV.FRESHA_BOOKING_URL,
+					links,
 				),
 			);
 			repo.markAlertStale(chatId, messageId, !edited);
@@ -176,7 +178,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 
 		if (newSlots.length > 0) {
 			const delivery = await deps.notify(
-				formatNewSlotsMessage(newStartTimes, ENV.FRESHA_BOOKING_URL),
+				formatNewSlotsMessage(newStartTimes, links),
 			);
 
 			repo.insertAlerts(delivery, target, newStartTimes);

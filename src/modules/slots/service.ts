@@ -2,7 +2,7 @@ import { ENV } from "varlock/env";
 import type { ChatId, Message, MessageId } from "@/modules/telegram";
 import { formatWallClock } from "@/utils/date";
 import { formatCurrentSlotsMessage } from "./format";
-import { watchTarget } from "./model";
+import { bookingLinks, watchTarget } from "./model";
 import type { SlotsRepository } from "./repository";
 
 export type SlotsDeps = {
@@ -31,7 +31,7 @@ export const createSlotsService = (deps: SlotsDeps) => {
 
 		const messageId = await deps.send(
 			chatId,
-			formatCurrentSlotsMessage(startTimes, ENV.FRESHA_BOOKING_URL),
+			formatCurrentSlotsMessage(startTimes, bookingLinks()),
 		);
 		if (messageId === undefined) return;
 
