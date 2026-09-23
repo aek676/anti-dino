@@ -1,4 +1,4 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { log } from "@/utils/logger";
 import { FreshaError } from "../model";
 import {
@@ -506,5 +506,88 @@ describe("listSlots", () => {
 		expect(
 			pressed.filter((a) => a.type === "onScreenTimeDaySelectorDateSet"),
 		).toHaveLength(1);
+	});
+});
+
+describe("rate limit cooldown", () => {
+	let clock: Temporal.Instant;
+	const counting = (responder: FetchFn) => {
+		let calls = 0;
+		const fetchFn: FetchFn = (url, init) => {
+			calls++;
+			return responder(url, init);
+		};
+		return {
+			fetchFn,
+			get calls() {
+				return calls;
+			},
+		};
+	};
+	const rateLimited =
+		(headers: Record<string, string> = {}): FetchFn =>
+		() =>
+			Promise.resolve(Response.json({}, { status: 429, headers }));
+
+	beforeEach(() => {
+		clock = Temporal.Instant.from("2026-09-14T10:00:00Z");
+	});
+
+	test("fails at once for 15 minutes after a 429 without Retry-After", async () => {
+		const fetch = counting(rateLimited());
+		const service = createFreshaService(fetch.fetchFn, { now: () => clock });
+
+		expect(await service.listServices(slug)).toMatchObject({ status: 429 });
+		expect(await service.listServices(slug)).toMatchObject({
+			status: 429,
+			retryAfterSeconds: 900,
+		});
+		expect(fetch.calls).toBe(1);
+		expect(service.rateLimitedUntil()?.toString()).toBe("2026-09-14T10:15:00Z");
+
+		clock = clock.add({ minutes: 15 });
+		expect(service.rateLimitedUntil()).toBeNull();
+		await service.listServices(slug);
+		expect(fetch.calls).toBe(2);
+	});
+
+	test("waits exactly the Retry-After of the 429", async () => {
+		const fetch = counting(rateLimited({ "retry-after": "711" }));
+		const service = createFreshaService(fetch.fetchFn, { now: () => clock });
+
+		await service.listServices(slug);
+		clock = clock.add({ seconds: 710 });
+		expect(await service.listServices(slug)).toMatchObject({
+			status: 429,
+			retryAfterSeconds: 1,
+		});
+		expect(fetch.calls).toBe(1);
+
+		clock = clock.add({ seconds: 1 });
+		await service.listServices(slug);
+		expect(fetch.calls).toBe(2);
+	});
+
+	test("blocks only the operation that was rate limited", async () => {
+		const fetch = counting((_, init) =>
+			(init.body as string).includes("BookingFlow_Initialize_Mutation")
+				? Promise.resolve(Response.json(initialize))
+				: rateLimited()("", init),
+		);
+		const service = createFreshaService(fetch.fetchFn, { now: () => clock });
+
+		expect(await service.listEmployees(slug, "sv:18605549")).toMatchObject({
+			status: 429,
+		});
+		expect(fetch.calls).toBe(2);
+		expect(service.rateLimitedUntil()).not.toBeNull();
+
+		expect(await service.listServices(slug)).toHaveLength(7);
+		expect(fetch.calls).toBe(3);
+
+		expect(await service.listEmployees(slug, "sv:18605549")).toMatchObject({
+			status: 429,
+		});
+		expect(fetch.calls).toBe(4);
 	});
 });

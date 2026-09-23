@@ -1,16 +1,12 @@
 import { Elysia, status, t } from "elysia";
 import { ENV } from "varlock/env";
 import { FreshaError, FreshaModel } from "./model";
-import { createFreshaService } from "./service";
+import type { FreshaService } from "./service";
 
 export { FreshaError, type FreshaModel } from "./model";
 export { createFreshaService, type FreshaService } from "./service";
 
-export const fresha = () => {
-	const freshaService = createFreshaService(fetch, {
-		stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
-	});
-
+export const fresha = (freshaService: FreshaService) => {
 	return new Elysia({ name: "fresha", prefix: "/fresha" })
 		.get(
 			"/services",

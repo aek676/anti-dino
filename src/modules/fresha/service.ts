@@ -146,6 +146,8 @@ export const parseSlots = (
 		: [];
 
 const TOO_MANY_REQUESTS = 429;
+// Fresha blocks for ~12 minutes when it sends no Retry-After; wait a bit longer than that.
+const DEFAULT_COOLDOWN_SECONDS = 15 * 60;
 
 const parseRetryAfter = (res: Response): number | undefined => {
 	const seconds = Number(res.headers.get("retry-after"));
@@ -155,14 +157,41 @@ const parseRetryAfter = (res: Response): number | undefined => {
 export type FreshaOptions = {
 	stepDelayMs?: number;
 	sleep?: Sleep;
+	now?: () => Temporal.Instant;
 };
 
 export type FreshaService = ReturnType<typeof createFreshaService>;
 
 export const createFreshaService = (
 	fetchFn: FetchFn = fetch,
-	{ stepDelayMs = 0, sleep = defaultSleep }: FreshaOptions = {},
+	{
+		stepDelayMs = 0,
+		sleep = defaultSleep,
+		now = Temporal.Now.instant,
+	}: FreshaOptions = {},
 ) => {
+	// Fresha rate limits each mutation on its own, so a 429 only blocks that operation.
+	const blockedUntil = new Map<Operation, Temporal.Instant>();
+
+	const blockedFor = (operation: Operation): number | undefined => {
+		const until = blockedUntil.get(operation);
+		if (!until) return;
+		const seconds = until.since(now()).total("seconds");
+		if (seconds > 0) return Math.ceil(seconds);
+		blockedUntil.delete(operation);
+	};
+
+	const rateLimitedUntil = (): Temporal.Instant | null => {
+		let latest: Temporal.Instant | null = null;
+		for (const operation of blockedUntil.keys()) {
+			if (blockedFor(operation) === undefined) continue;
+			const until = blockedUntil.get(operation) as Temporal.Instant;
+			if (!latest || Temporal.Instant.compare(until, latest) > 0)
+				latest = until;
+		}
+		return latest;
+	};
+
 	const call = async <T>(
 		operation: Operation,
 		variables: Record<string, unknown>,
@@ -172,6 +201,21 @@ export const createFreshaService = (
 			typeof variables.id === "string"
 				? parseActionId(variables.id).type
 				: undefined;
+
+		const remaining = blockedFor(operation);
+		if (remaining !== undefined) {
+			log.debug(
+				{ operation: name, action, retryAfterSeconds: remaining },
+				"fresha call skipped while rate limited",
+			);
+			return new FreshaError(
+				`${name}: rate limited for ${remaining}s`,
+				"http",
+				TOO_MANY_REQUESTS,
+				remaining,
+			);
+		}
+
 		const startedAt = performance.now();
 		const res = await fetchFn(ENDPOINT, {
 			method: "POST",
@@ -204,6 +248,12 @@ export const createFreshaService = (
 		if (!res.ok) {
 			const retryAfterSeconds = parseRetryAfter(res);
 			if (res.status === TOO_MANY_REQUESTS) {
+				blockedUntil.set(
+					operation,
+					now().add({
+						seconds: retryAfterSeconds ?? DEFAULT_COOLDOWN_SECONDS,
+					}),
+				);
 				log.warn(
 					{ operation: name, action, retryAfterSeconds },
 					"fresha rate limited",
@@ -378,5 +428,5 @@ export const createFreshaService = (
 		);
 	};
 
-	return { listServices, listEmployees, listSlots };
+	return { listServices, listEmployees, listSlots, rateLimitedUntil };
 };

@@ -30,6 +30,10 @@ const slotsService = createSlotsService({
 	send: telegramService.send,
 });
 
+const freshaService = createFreshaService(fetch, {
+	stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
+});
+
 const app = new Elysia()
 	.use(
 		log.into({
@@ -38,13 +42,11 @@ const app = new Elysia()
 	)
 	.use(health(db))
 	.decorate("db", db)
-	.use(fresha())
+	.use(fresha(freshaService))
 	.use(
 		watchdog({
 			repo: slotsRepository,
-			fresha: createFreshaService(fetch, {
-				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
-			}),
+			fresha: freshaService,
 			notify: telegramService.notify,
 			notifyAdmin: telegramService.notifyAdmin,
 			edit: telegramService.edit,
