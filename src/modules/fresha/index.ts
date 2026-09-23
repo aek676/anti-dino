@@ -4,7 +4,11 @@ import { FreshaError, FreshaModel } from "./model";
 import type { FreshaService } from "./service";
 
 export { FreshaError, type FreshaModel } from "./model";
-export { createFreshaService, type FreshaService } from "./service";
+export {
+	type Booking,
+	createFreshaService,
+	type FreshaService,
+} from "./service";
 
 export const fresha = (freshaService: FreshaService) => {
 	return new Elysia({ name: "fresha", prefix: "/fresha" })

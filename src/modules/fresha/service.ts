@@ -29,6 +29,7 @@ type GraphqlResponse<T> = {
 };
 
 type ServicesScreen = {
+	continueAction?: { id: string };
 	categories: {
 		items: {
 			name: string;
@@ -56,15 +57,21 @@ type EmployeeScreen = {
 };
 
 type TimeScreen = {
+	continueAction?: { id: string };
 	dates: {
 		date: { iso: string };
 		isAvailableToBeBooked: boolean;
 		isLoading?: boolean;
+		isSelected?: boolean;
 		action: { id: string } | null;
 	}[];
 	day: {
 		__typename: string;
-		timeslots?: { time: string }[];
+		timeslots?: {
+			time: string;
+			isSelected?: boolean;
+			action?: { id: string } | null;
+		}[];
 	};
 };
 
@@ -161,6 +168,13 @@ export type FreshaOptions = {
 };
 
 export type FreshaService = ReturnType<typeof createFreshaService>;
+
+export type Booking = { cartId: string; selected: boolean };
+
+type InitializeInput = {
+	options?: Record<string, unknown>;
+	shouldAutoContinue?: boolean;
+};
 
 export const createFreshaService = (
 	fetchFn: FetchFn = fetch,
@@ -293,7 +307,10 @@ export const createFreshaService = (
 			: result;
 	};
 
-	const initialize = async (locationSlug: string) => {
+	const initialize = async (
+		locationSlug: string,
+		{ options = {}, shouldAutoContinue = true }: InitializeInput = {},
+	) => {
 		const data = await call<InitializeResult>("initialize", {
 			withRecommendedServices: false,
 			input: {
@@ -304,8 +321,9 @@ export const createFreshaService = (
 					shouldShowAllEmployees: false,
 					isGroupBooking: false,
 					isRebook: false,
+					...options,
 				},
-				shouldAutoContinue: true,
+				shouldAutoContinue,
 				capabilities: CAPABILITIES,
 			},
 		});
@@ -428,5 +446,67 @@ export const createFreshaService = (
 		);
 	};
 
-	return { listServices, listEmployees, listSlots, rateLimitedUntil };
+	const prepareBooking = async (
+		locationSlug: string,
+		variantId: string,
+		employeeId: number,
+		slot: FreshaModel["slot"],
+	): Promise<Booking | FreshaError> => {
+		const init = await initialize(locationSlug, {
+			options: {
+				isFromLinkBuilder: false,
+				offerItems: [variantId],
+				employeeId: String(employeeId),
+				preferredDate: slot.date,
+			},
+			shouldAutoContinue: false,
+		});
+		if (init instanceof FreshaError) return init;
+
+		const continueAction = init.screenServices.continueAction;
+		if (!continueAction)
+			return new FreshaError(
+				"services screen has no continue action",
+				"graphql",
+			);
+
+		const time = await press(continueAction.id, init.cartId);
+		if (time instanceof FreshaError) return time;
+
+		// From here on the cart sits on the time screen, so it is worth opening even if the hour is gone.
+		const gone = { cartId: init.cartId, selected: false };
+
+		const { dates, day } = time.screenTime;
+		const selectedDay = dates?.find((entry) => entry.isSelected);
+		if (!selectedDay?.date.iso.startsWith(slot.date)) return gone;
+
+		const timeslot = day?.timeslots?.find((entry) => entry.time === slot.time);
+		if (!timeslot?.action) return gone;
+
+		const selected = await press(timeslot.action.id, init.cartId);
+		if (selected instanceof FreshaError) return selected;
+
+		const isSelected = selected.screenTime.day?.timeslots?.some(
+			(entry) => entry.time === slot.time && entry.isSelected,
+		);
+		if (!isSelected) return gone;
+
+		const timeContinue = selected.screenTime.continueAction;
+		if (!timeContinue)
+			return new FreshaError("time screen has no continue action", "graphql");
+
+		// Without a session this lands on the login modal; the browser takes it from there.
+		const confirmed = await press(timeContinue.id, init.cartId);
+		if (confirmed instanceof FreshaError) return confirmed;
+
+		return { cartId: init.cartId, selected: true };
+	};
+
+	return {
+		listServices,
+		listEmployees,
+		listSlots,
+		prepareBooking,
+		rateLimitedUntil,
+	};
 };

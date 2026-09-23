@@ -591,3 +591,149 @@ describe("rate limit cooldown", () => {
 		expect(fetch.calls).toBe(4);
 	});
 });
+
+describe("prepareBooking", () => {
+	const slot = { date: "2026-09-08", time: "12:15" };
+	const cartId = initialize.data.bookingFlowInitialize.cartId;
+
+	const selectedTime = () => {
+		const screen = structuredClone(day);
+		const { day: opened } =
+			screen.data.bookingFlowActionButtonPressed.screenTime;
+		opened.timeslots = opened.timeslots.map((entry) => ({
+			...entry,
+			isSelected: entry.time === slot.time,
+		}));
+		return screen;
+	};
+
+	const router = (overrides: Record<string, unknown> = {}) => {
+		const calls: {
+			operationName: string;
+			variables: { id: string; cartId: string; input: unknown };
+		}[] = [];
+		const fetchFn: FetchFn = (_, init) => {
+			const body = JSON.parse(init.body as string);
+			calls.push(body);
+			if (body.operationName === "BookingFlow_Initialize_Mutation") {
+				return Promise.resolve(Response.json(initialize));
+			}
+			const [action] = JSON.parse(body.variables.id);
+			const responses: Record<string, unknown> = {
+				onScreenServicesContinue: day,
+				onScreenTimeSet: selectedTime(),
+				onScreenTimeContinue: day,
+				...overrides,
+			};
+			const response = responses[action.type];
+			return Promise.resolve(
+				response instanceof Response ? response : Response.json(response),
+			);
+		};
+		return { fetchFn, calls };
+	};
+
+	const prepare = (fetchFn: FetchFn, target = slot) =>
+		createFreshaService(fetchFn).prepareBooking(
+			slug,
+			"sv:18605549",
+			3182031,
+			target,
+		);
+
+	test("leaves a cart with the slot selected in four calls", async () => {
+		const { fetchFn, calls } = router();
+
+		const result = await prepare(fetchFn);
+
+		expect(result).toEqual({ cartId, selected: true });
+		expect(calls.map((c) => c.operationName)).toEqual([
+			"BookingFlow_Initialize_Mutation",
+			"BookingFlow_ActionButtonPressed_Mutation",
+			"BookingFlow_ActionButtonPressed_Mutation",
+			"BookingFlow_ActionButtonPressed_Mutation",
+		]);
+		expect(calls[0]?.variables.input).toMatchObject({
+			shouldAutoContinue: false,
+			options: {
+				isFromLinkBuilder: false,
+				offerItems: ["sv:18605549"],
+				employeeId: "3182031",
+				preferredDate: "2026-09-08",
+			},
+		});
+
+		const pressed = calls.slice(1).map((c) => JSON.parse(c.variables.id)[0]);
+		expect(pressed.map((a) => a.type)).toEqual([
+			"onScreenServicesContinue",
+			"onScreenTimeSet",
+			"onScreenTimeContinue",
+		]);
+		expect(pressed[1]).toMatchObject({ date: "2026-09-08", time: 44100 });
+		expect(calls.slice(1).map((c) => c.variables.cartId)).toEqual([
+			cartId,
+			cartId,
+			cartId,
+		]);
+	});
+
+	test("stops at the time screen when Fresha no longer offers that hour", async () => {
+		const { fetchFn, calls } = router();
+
+		const result = await prepare(fetchFn, {
+			date: "2026-09-08",
+			time: "09:00",
+		});
+
+		expect(result).toEqual({ cartId, selected: false });
+		expect(calls).toHaveLength(2);
+	});
+
+	test("stops at the time screen when it opens another day", async () => {
+		const { fetchFn, calls } = router();
+
+		const result = await prepare(fetchFn, {
+			date: "2026-09-09",
+			time: "12:15",
+		});
+
+		expect(result).toEqual({ cartId, selected: false });
+		expect(calls).toHaveLength(2);
+	});
+
+	test("stops at the time screen when the hour does not stay selected", async () => {
+		const { fetchFn, calls } = router({ onScreenTimeSet: day });
+
+		const result = await prepare(fetchFn);
+
+		expect(result).toEqual({ cartId, selected: false });
+		expect(calls).toHaveLength(3);
+	});
+
+	test("fails when Fresha rejects a step with an error toast", async () => {
+		const rejected = structuredClone(day);
+		Object.assign(rejected.data.bookingFlowActionButtonPressed, {
+			toasts: [{ __typename: "BookingFlowToastError" }],
+		});
+		const { fetchFn, calls } = router({ onScreenTimeContinue: rejected });
+
+		const result = await prepare(fetchFn);
+
+		expect(result).toBeInstanceOf(FreshaError);
+		expect(calls).toHaveLength(4);
+	});
+
+	test("hands back a 429 without retrying", async () => {
+		const { fetchFn, calls } = router({
+			onScreenServicesContinue: Response.json(
+				{},
+				{ status: 429, headers: { "retry-after": "711" } },
+			),
+		});
+
+		const result = await prepare(fetchFn);
+
+		expect(result).toMatchObject({ status: 429, retryAfterSeconds: 711 });
+		expect(calls).toHaveLength(2);
+	});
+});
