@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { Bot } from "grammy";
 import { ENV } from "varlock/env";
+import { book } from "@/modules/book";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
 import { createSlotsRepository, createSlotsService } from "@/modules/slots";
@@ -52,6 +53,7 @@ const app = new Elysia()
 			edit: telegramService.edit,
 		}),
 	)
+	.use(book({ fresha: freshaService }))
 	.use(
 		telegram({
 			bot,
