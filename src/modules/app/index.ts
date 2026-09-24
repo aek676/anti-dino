@@ -90,6 +90,11 @@ const app = new Elysia()
 	.use(
 		telegram({
 			bot,
+			config: {
+				publicUrl: ENV.PUBLIC_URL,
+				webhookPath: ENV.WEBHOOK_PATH,
+				webhookSecret: ENV.TELEGRAM_WEBHOOK_SECRET,
+			},
 			subscribe: subscribersRepository.subscribe,
 			unsubscribe: subscribersRepository.unsubscribe,
 			isSubscribed: subscribersRepository.isSubscribed,
