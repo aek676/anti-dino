@@ -2,7 +2,12 @@ import { Elysia, t } from "elysia";
 import { type BookDeps, createBookService } from "./service";
 
 export { type BookOutcome, parseSlot } from "./model";
-export { type BookDeps, type BookResult, createBookService } from "./service";
+export {
+	type BookConfig,
+	type BookDeps,
+	type BookResult,
+	createBookService,
+} from "./service";
 
 export const BOOK_PATH = "/book";
 

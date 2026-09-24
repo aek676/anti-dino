@@ -72,7 +72,18 @@ const app = new Elysia()
 			},
 		}),
 	)
-	.use(book({ fresha: freshaService }))
+	.use(
+		book({
+			fresha: freshaService,
+			config: {
+				locationId: String(ENV.FRESHA_LOCATION_ID),
+				locationSlug: ENV.FRESHA_LOCATION_SLUG,
+				serviceId: ENV.FRESHA_SERVICE_ID,
+				employeeId: ENV.FRESHA_EMPLOYEE_ID,
+				timeZone: ENV.SALON_TIME_ZONE,
+			},
+		}),
+	)
 	.use(
 		telegram({
 			bot,
