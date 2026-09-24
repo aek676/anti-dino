@@ -58,7 +58,7 @@ const app = new Elysia()
 	)
 	.use(health(db))
 	.decorate("db", db)
-	.use(fresha(freshaService))
+	.use(fresha(freshaService, { daysAhead: ENV.DAYS_AHEAD }))
 	.use(
 		watchdog({
 			repo: slotsRepository,

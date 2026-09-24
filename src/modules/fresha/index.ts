@@ -1,5 +1,4 @@
 import { Elysia, status, t } from "elysia";
-import { ENV } from "varlock/env";
 import { FreshaError, FreshaModel } from "./model";
 import type { FreshaService } from "./service";
 
@@ -10,7 +9,9 @@ export {
 	type FreshaService,
 } from "./service";
 
-export const fresha = (freshaService: FreshaService) => {
+export type FreshaConfig = { daysAhead: number };
+
+export const fresha = (freshaService: FreshaService, config: FreshaConfig) => {
 	return new Elysia({ name: "fresha", prefix: "/fresha" })
 		.get(
 			"/services",
@@ -59,7 +60,7 @@ export const fresha = (freshaService: FreshaService) => {
 					query.slug,
 					query.variantId,
 					query.employeeId,
-					ENV.DAYS_AHEAD,
+					config.daysAhead,
 				);
 				return result instanceof FreshaError
 					? status(502, { message: result.message, kind: result.kind })
