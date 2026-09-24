@@ -4,6 +4,12 @@ export {
 	formatUpdatedMessage,
 	slotKey,
 } from "./format";
-export { type WatchTarget, watchTarget } from "./model";
+export { SlotsModel } from "./model";
 export { createSlotsRepository, type SlotsRepository } from "./repository";
-export { createSlotsService, type SlotsDeps } from "./service";
+export {
+	bookingLinks,
+	createSlotsService,
+	type SlotsConfig,
+	type SlotsDeps,
+	watchTarget,
+} from "./service";

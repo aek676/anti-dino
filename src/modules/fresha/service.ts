@@ -29,6 +29,7 @@ type GraphqlResponse<T> = {
 };
 
 type ServicesScreen = {
+	continueAction?: { id: string };
 	categories: {
 		items: {
 			name: string;
@@ -56,15 +57,21 @@ type EmployeeScreen = {
 };
 
 type TimeScreen = {
+	continueAction?: { id: string };
 	dates: {
 		date: { iso: string };
 		isAvailableToBeBooked: boolean;
 		isLoading?: boolean;
+		isSelected?: boolean;
 		action: { id: string } | null;
 	}[];
 	day: {
 		__typename: string;
-		timeslots?: { time: string }[];
+		timeslots?: {
+			time: string;
+			isSelected?: boolean;
+			action?: { id: string } | null;
+		}[];
 	};
 };
 
@@ -146,6 +153,8 @@ export const parseSlots = (
 		: [];
 
 const TOO_MANY_REQUESTS = 429;
+// Fresha blocks for ~12 minutes when it sends no Retry-After; wait a bit longer than that.
+const DEFAULT_COOLDOWN_SECONDS = 15 * 60;
 
 const parseRetryAfter = (res: Response): number | undefined => {
 	const seconds = Number(res.headers.get("retry-after"));
@@ -155,14 +164,47 @@ const parseRetryAfter = (res: Response): number | undefined => {
 export type FreshaOptions = {
 	stepDelayMs?: number;
 	sleep?: Sleep;
+	now?: () => Temporal.Instant;
 };
 
 export type FreshaService = ReturnType<typeof createFreshaService>;
 
+export type Booking = { cartId: string; selected: boolean };
+
+type InitializeInput = {
+	options?: Record<string, unknown>;
+	shouldAutoContinue?: boolean;
+};
+
 export const createFreshaService = (
 	fetchFn: FetchFn = fetch,
-	{ stepDelayMs = 0, sleep = defaultSleep }: FreshaOptions = {},
+	{
+		stepDelayMs = 0,
+		sleep = defaultSleep,
+		now = Temporal.Now.instant,
+	}: FreshaOptions = {},
 ) => {
+	// Fresha rate limits each mutation on its own, so a 429 only blocks that operation.
+	const blockedUntil = new Map<Operation, Temporal.Instant>();
+
+	const blockedFor = (operation: Operation): number | undefined => {
+		const until = blockedUntil.get(operation);
+		if (!until) return;
+		const seconds = until.since(now()).total("seconds");
+		if (seconds > 0) return Math.ceil(seconds);
+		blockedUntil.delete(operation);
+	};
+
+	const rateLimitedUntil = (): Temporal.Instant | null => {
+		let latest: Temporal.Instant | null = null;
+		for (const [operation, until] of blockedUntil) {
+			if (blockedFor(operation) === undefined) continue;
+			if (!latest || Temporal.Instant.compare(until, latest) > 0)
+				latest = until;
+		}
+		return latest;
+	};
+
 	const call = async <T>(
 		operation: Operation,
 		variables: Record<string, unknown>,
@@ -172,6 +214,21 @@ export const createFreshaService = (
 			typeof variables.id === "string"
 				? parseActionId(variables.id).type
 				: undefined;
+
+		const remaining = blockedFor(operation);
+		if (remaining !== undefined) {
+			log.debug(
+				{ operation: name, action, retryAfterSeconds: remaining },
+				"fresha call skipped while rate limited",
+			);
+			return new FreshaError(
+				`${name}: rate limited for ${remaining}s`,
+				"http",
+				TOO_MANY_REQUESTS,
+				remaining,
+			);
+		}
+
 		const startedAt = performance.now();
 		const res = await fetchFn(ENDPOINT, {
 			method: "POST",
@@ -204,6 +261,12 @@ export const createFreshaService = (
 		if (!res.ok) {
 			const retryAfterSeconds = parseRetryAfter(res);
 			if (res.status === TOO_MANY_REQUESTS) {
+				blockedUntil.set(
+					operation,
+					now().add({
+						seconds: retryAfterSeconds ?? DEFAULT_COOLDOWN_SECONDS,
+					}),
+				);
 				log.warn(
 					{ operation: name, action, retryAfterSeconds },
 					"fresha rate limited",
@@ -243,7 +306,10 @@ export const createFreshaService = (
 			: result;
 	};
 
-	const initialize = async (locationSlug: string) => {
+	const initialize = async (
+		locationSlug: string,
+		{ options = {}, shouldAutoContinue = true }: InitializeInput = {},
+	) => {
 		const data = await call<InitializeResult>("initialize", {
 			withRecommendedServices: false,
 			input: {
@@ -254,8 +320,9 @@ export const createFreshaService = (
 					shouldShowAllEmployees: false,
 					isGroupBooking: false,
 					isRebook: false,
+					...options,
 				},
-				shouldAutoContinue: true,
+				shouldAutoContinue,
 				capabilities: CAPABILITIES,
 			},
 		});
@@ -378,5 +445,67 @@ export const createFreshaService = (
 		);
 	};
 
-	return { listServices, listEmployees, listSlots };
+	const prepareBooking = async (
+		locationSlug: string,
+		variantId: string,
+		employeeId: number,
+		slot: FreshaModel["slot"],
+	): Promise<Booking | FreshaError> => {
+		const init = await initialize(locationSlug, {
+			options: {
+				isFromLinkBuilder: false,
+				offerItems: [variantId],
+				employeeId: String(employeeId),
+				preferredDate: slot.date,
+			},
+			shouldAutoContinue: false,
+		});
+		if (init instanceof FreshaError) return init;
+
+		const continueAction = init.screenServices.continueAction;
+		if (!continueAction)
+			return new FreshaError(
+				"services screen has no continue action",
+				"graphql",
+			);
+
+		const time = await press(continueAction.id, init.cartId);
+		if (time instanceof FreshaError) return time;
+
+		// From here on the cart sits on the time screen, so it is worth opening even if the hour is gone.
+		const gone = { cartId: init.cartId, selected: false };
+
+		const { dates, day } = time.screenTime;
+		const selectedDay = dates?.find((entry) => entry.isSelected);
+		if (!selectedDay?.date.iso.startsWith(slot.date)) return gone;
+
+		const timeslot = day?.timeslots?.find((entry) => entry.time === slot.time);
+		if (!timeslot?.action) return gone;
+
+		const selected = await press(timeslot.action.id, init.cartId);
+		if (selected instanceof FreshaError) return selected;
+
+		const isSelected = selected.screenTime.day?.timeslots?.some(
+			(entry) => entry.time === slot.time && entry.isSelected,
+		);
+		if (!isSelected) return gone;
+
+		const timeContinue = selected.screenTime.continueAction;
+		if (!timeContinue)
+			return new FreshaError("time screen has no continue action", "graphql");
+
+		// Without a session this lands on the login modal; the browser takes it from there.
+		const confirmed = await press(timeContinue.id, init.cartId);
+		if (confirmed instanceof FreshaError) return confirmed;
+
+		return { cartId: init.cartId, selected: true };
+	};
+
+	return {
+		listServices,
+		listEmployees,
+		listSlots,
+		prepareBooking,
+		rateLimitedUntil,
+	};
 };

@@ -1,6 +1,5 @@
 import { Elysia, status, t } from "elysia";
 import type { Bot } from "grammy";
-import { ENV } from "varlock/env";
 import { log } from "@/utils/logger";
 import { COMMANDS, type CommandsDeps, registerCommands } from "./commands";
 
@@ -18,9 +17,18 @@ export {
 } from "./repository";
 export { createTelegramService } from "./service";
 
-export type TelegramPluginDeps = { bot: Bot } & CommandsDeps;
+export type TelegramConfig = {
+	publicUrl: string;
+	webhookPath: string;
+	webhookSecret: string;
+};
 
-export const telegram = ({ bot, ...commands }: TelegramPluginDeps) => {
+export type TelegramPluginDeps = {
+	bot: Bot;
+	config: TelegramConfig;
+} & CommandsDeps;
+
+export const telegram = ({ bot, config, ...commands }: TelegramPluginDeps) => {
 	registerCommands(bot, commands);
 
 	return new Elysia({ name: "telegram" })
@@ -28,20 +36,17 @@ export const telegram = ({ bot, ...commands }: TelegramPluginDeps) => {
 			try {
 				await bot.init();
 				await bot.api.setMyCommands(COMMANDS);
-				await bot.api.setWebhook(ENV.PUBLIC_URL + ENV.WEBHOOK_PATH, {
-					secret_token: ENV.TELEGRAM_WEBHOOK_SECRET,
+				await bot.api.setWebhook(config.publicUrl + config.webhookPath, {
+					secret_token: config.webhookSecret,
 				});
 			} catch (error) {
 				log.error({ err: error });
 			}
 		})
 		.post(
-			ENV.WEBHOOK_PATH,
+			config.webhookPath,
 			async ({ headers, body }) => {
-				if (
-					headers["x-telegram-bot-api-secret-token"] !==
-					ENV.TELEGRAM_WEBHOOK_SECRET
-				)
+				if (headers["x-telegram-bot-api-secret-token"] !== config.webhookSecret)
 					return status(401);
 
 				await bot.handleUpdate(body);

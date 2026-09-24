@@ -1,16 +1,17 @@
 import { Elysia, status, t } from "elysia";
-import { ENV } from "varlock/env";
 import { FreshaError, FreshaModel } from "./model";
-import { createFreshaService } from "./service";
+import type { FreshaService } from "./service";
 
 export { FreshaError, type FreshaModel } from "./model";
-export { createFreshaService, type FreshaService } from "./service";
+export {
+	type Booking,
+	createFreshaService,
+	type FreshaService,
+} from "./service";
 
-export const fresha = () => {
-	const freshaService = createFreshaService(fetch, {
-		stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
-	});
+export type FreshaConfig = { daysAhead: number };
 
+export const fresha = (freshaService: FreshaService, config: FreshaConfig) => {
 	return new Elysia({ name: "fresha", prefix: "/fresha" })
 		.get(
 			"/services",
@@ -59,7 +60,7 @@ export const fresha = () => {
 					query.slug,
 					query.variantId,
 					query.employeeId,
-					ENV.DAYS_AHEAD,
+					config.daysAhead,
 				);
 				return result instanceof FreshaError
 					? status(502, { message: result.message, kind: result.kind })

@@ -29,7 +29,9 @@ The bot receives updates over a webhook, so Telegram needs a public HTTPS URL
 that reaches your machine. On startup the app registers
 `PUBLIC_URL + WEBHOOK_PATH` with Telegram, which means the tunnel has to be up
 and `PUBLIC_URL` set before `bun run dev`. Run each in its own terminal so the
-logs stay apart.
+logs stay apart. The same URL serves the `/book/<date>T<time>` links behind
+each hour in the alerts: the server prepares a Fresha cart on that day, with
+the hour selected when it is still free, and redirects to it.
 
 The default is a [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
 quick tunnel, which needs no account and no domain:

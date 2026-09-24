@@ -1,17 +1,24 @@
 import { Elysia } from "elysia";
 import { Bot } from "grammy";
 import { ENV } from "varlock/env";
+import { book, slotUrl } from "@/modules/book";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
-import { createSlotsRepository, createSlotsService } from "@/modules/slots";
+import {
+	createSlotsRepository,
+	createSlotsService,
+	type SlotsConfig,
+} from "@/modules/slots";
 import {
 	createSubscribersRepository,
 	createTelegramService,
 	telegram,
 } from "@/modules/telegram";
 import { watchdog } from "@/modules/watchdog";
-import { closeDatabase, db } from "@/utils/db";
+import { closeDatabase, openDatabase } from "@/utils/db";
 import { log } from "@/utils/logger";
+
+const db = openDatabase(ENV.DATABASE_PATH);
 
 const bot = new Bot(ENV.TELEGRAM_BOT_TOKEN);
 
@@ -23,11 +30,24 @@ const telegramService = createTelegramService({
 	adminChatId: ENV.ADMIN_CHAT_ID,
 });
 
+const slotsConfig: SlotsConfig = {
+	employeeId: ENV.FRESHA_EMPLOYEE_ID,
+	serviceId: ENV.FRESHA_SERVICE_ID,
+	salonUrl: ENV.FRESHA_BOOKING_URL,
+	slotUrl: (startsAt) => slotUrl(ENV.PUBLIC_URL, startsAt),
+	timeZone: ENV.SALON_TIME_ZONE,
+};
+
 const slotsRepository = createSlotsRepository(db);
 
 const slotsService = createSlotsService({
 	repo: slotsRepository,
 	send: telegramService.send,
+	config: slotsConfig,
+});
+
+const freshaService = createFreshaService(fetch, {
+	stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
 });
 
 const app = new Elysia()
@@ -38,21 +58,43 @@ const app = new Elysia()
 	)
 	.use(health(db))
 	.decorate("db", db)
-	.use(fresha())
+	.use(fresha(freshaService, { daysAhead: ENV.DAYS_AHEAD }))
 	.use(
 		watchdog({
 			repo: slotsRepository,
-			fresha: createFreshaService(fetch, {
-				stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
-			}),
+			fresha: freshaService,
 			notify: telegramService.notify,
 			notifyAdmin: telegramService.notifyAdmin,
 			edit: telegramService.edit,
+			config: {
+				...slotsConfig,
+				locationId: String(ENV.FRESHA_LOCATION_ID),
+				daysAhead: ENV.DAYS_AHEAD,
+				failureThreshold: ENV.FAILURE_ALERT_THRESHOLD,
+				checkIntervalMinutes: ENV.CHECK_INTERVAL_MINUTES,
+			},
+		}),
+	)
+	.use(
+		book({
+			fresha: freshaService,
+			config: {
+				locationId: String(ENV.FRESHA_LOCATION_ID),
+				locationSlug: ENV.FRESHA_LOCATION_SLUG,
+				serviceId: ENV.FRESHA_SERVICE_ID,
+				employeeId: ENV.FRESHA_EMPLOYEE_ID,
+				timeZone: ENV.SALON_TIME_ZONE,
+			},
 		}),
 	)
 	.use(
 		telegram({
 			bot,
+			config: {
+				publicUrl: ENV.PUBLIC_URL,
+				webhookPath: ENV.WEBHOOK_PATH,
+				webhookSecret: ENV.TELEGRAM_WEBHOOK_SECRET,
+			},
 			subscribe: subscribersRepository.subscribe,
 			unsubscribe: subscribersRepository.unsubscribe,
 			isSubscribed: subscribersRepository.isSubscribed,
