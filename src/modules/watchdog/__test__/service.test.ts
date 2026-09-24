@@ -20,6 +20,7 @@ const config: WatchdogConfig = {
 	locationId: "1",
 	daysAhead: 31,
 	failureThreshold: 5,
+	checkIntervalMinutes: 5,
 };
 
 const target = watchTarget(config);

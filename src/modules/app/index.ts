@@ -71,6 +71,7 @@ const app = new Elysia()
 				locationId: String(ENV.FRESHA_LOCATION_ID),
 				daysAhead: ENV.DAYS_AHEAD,
 				failureThreshold: ENV.FAILURE_ALERT_THRESHOLD,
+				checkIntervalMinutes: ENV.CHECK_INTERVAL_MINUTES,
 			},
 		}),
 	)

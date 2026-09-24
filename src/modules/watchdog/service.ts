@@ -23,6 +23,7 @@ export type WatchdogConfig = SlotsConfig & {
 	locationId: string;
 	daysAhead: number;
 	failureThreshold: number;
+	checkIntervalMinutes: number;
 };
 
 export type WatchdogDeps = {
