@@ -1,4 +1,3 @@
-import { slotUrl } from "@/modules/book";
 import type { ChatId, Message, MessageId } from "@/modules/telegram";
 import { formatWallClock } from "@/utils/date";
 import { formatCurrentSlotsMessage } from "./format";
@@ -9,7 +8,7 @@ export type SlotsConfig = {
 	employeeId: number;
 	serviceId: string;
 	salonUrl: string;
-	publicUrl: string;
+	slotUrl: (startsAt: string) => string;
 	timeZone: string;
 };
 
@@ -21,10 +20,10 @@ export const watchTarget = (
 });
 
 export const bookingLinks = (
-	config: Pick<SlotsConfig, "salonUrl" | "publicUrl">,
+	config: Pick<SlotsConfig, "salonUrl" | "slotUrl">,
 ): SlotsModel["bookingLinks"] => ({
 	salon: config.salonUrl,
-	slot: (startsAt) => slotUrl(config.publicUrl, startsAt),
+	slot: config.slotUrl,
 });
 
 export type SlotsDeps = {

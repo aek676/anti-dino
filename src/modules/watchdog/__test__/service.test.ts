@@ -15,7 +15,7 @@ const config: WatchdogConfig = {
 	employeeId: 1,
 	serviceId: "sv:1",
 	salonUrl: "https://salon.test",
-	publicUrl: "https://app.test",
+	slotUrl: (startsAt) => `https://app.test/book/${startsAt}`,
 	timeZone: "Europe/Madrid",
 	locationId: "1",
 	daysAhead: 31,

@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { Bot } from "grammy";
 import { ENV } from "varlock/env";
-import { book } from "@/modules/book";
+import { book, slotUrl } from "@/modules/book";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
 import {
@@ -32,7 +32,7 @@ const slotsConfig: SlotsConfig = {
 	employeeId: ENV.FRESHA_EMPLOYEE_ID,
 	serviceId: ENV.FRESHA_SERVICE_ID,
 	salonUrl: ENV.FRESHA_BOOKING_URL,
-	publicUrl: ENV.PUBLIC_URL,
+	slotUrl: (startsAt) => slotUrl(ENV.PUBLIC_URL, startsAt),
 	timeZone: ENV.SALON_TIME_ZONE,
 };
 
