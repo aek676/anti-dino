@@ -15,8 +15,10 @@ import {
 	telegram,
 } from "@/modules/telegram";
 import { watchdog } from "@/modules/watchdog";
-import { closeDatabase, db } from "@/utils/db";
+import { closeDatabase, openDatabase } from "@/utils/db";
 import { log } from "@/utils/logger";
+
+const db = openDatabase(ENV.DATABASE_PATH);
 
 const bot = new Bot(ENV.TELEGRAM_BOT_TOKEN);
 
