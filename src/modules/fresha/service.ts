@@ -197,9 +197,8 @@ export const createFreshaService = (
 
 	const rateLimitedUntil = (): Temporal.Instant | null => {
 		let latest: Temporal.Instant | null = null;
-		for (const operation of blockedUntil.keys()) {
+		for (const [operation, until] of blockedUntil) {
 			if (blockedFor(operation) === undefined) continue;
-			const until = blockedUntil.get(operation) as Temporal.Instant;
 			if (!latest || Temporal.Instant.compare(until, latest) > 0)
 				latest = until;
 		}
