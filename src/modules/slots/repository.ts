@@ -1,17 +1,20 @@
 import type { ChatId, Delivery, MessageId } from "@/modules/telegram";
 import type { Db } from "@/utils/db";
-import type { WatchTarget } from "./model";
+import type { SlotsModel } from "./model";
 
 export type SlotsRepository = ReturnType<typeof createSlotsRepository>;
 
 export const createSlotsRepository = (db: Db) => {
-	const selectSlotStartTimes = db.query<{ starts_at: string }, WatchTarget>(
+	const selectSlotStartTimes = db.query<
+		{ starts_at: string },
+		SlotsModel["watchTarget"]
+	>(
 		"SELECT starts_at FROM slots WHERE employee_id = :employeeId AND service_id = :serviceId AND gone_at IS NULL ORDER BY starts_at",
 	);
 
 	const insertSlot = db.query<
 		void,
-		WatchTarget & { startsAt: string; seenAt: string }
+		SlotsModel["watchTarget"] & { startsAt: string; seenAt: string }
 	>(
 		`INSERT OR IGNORE INTO slots (employee_id, service_id, starts_at, seen_at, last_seen_at)
 		 VALUES (:employeeId, :serviceId, :startsAt, :seenAt, :seenAt)`,
@@ -19,7 +22,7 @@ export const createSlotsRepository = (db: Db) => {
 
 	const updateSlotsGone = db.query<
 		void,
-		WatchTarget & { goneStartTimes: string; seenAt: string }
+		SlotsModel["watchTarget"] & { goneStartTimes: string; seenAt: string }
 	>(
 		`UPDATE slots SET gone_at = :seenAt
 		 WHERE employee_id = :employeeId AND service_id = :serviceId AND gone_at IS NULL
@@ -28,7 +31,7 @@ export const createSlotsRepository = (db: Db) => {
 
 	const updateSlotsLastSeen = db.query<
 		void,
-		WatchTarget & { goneStartTimes: string; seenAt: string }
+		SlotsModel["watchTarget"] & { goneStartTimes: string; seenAt: string }
 	>(
 		`UPDATE slots SET last_seen_at = :seenAt
 		 WHERE employee_id = :employeeId AND service_id = :serviceId AND gone_at IS NULL
@@ -37,14 +40,18 @@ export const createSlotsRepository = (db: Db) => {
 
 	const insertAlert = db.query<
 		void,
-		WatchTarget & { chatId: ChatId; messageId: MessageId; startsAt: string }
+		SlotsModel["watchTarget"] & {
+			chatId: ChatId;
+			messageId: MessageId;
+			startsAt: string;
+		}
 	>(
 		`INSERT OR IGNORE INTO alerts (chat_id, message_id, employee_id, service_id, starts_at) VALUES (:chatId, :messageId, :employeeId, :serviceId, :startsAt)`,
 	);
 
 	const selectAlertMessages = db.query<
 		{ chat_id: ChatId; message_id: MessageId },
-		WatchTarget & { startTimes: string }
+		SlotsModel["watchTarget"] & { startTimes: string }
 	>(
 		`SELECT DISTINCT chat_id, message_id FROM alerts
 		 WHERE employee_id = :employeeId AND service_id = :serviceId
@@ -69,11 +76,15 @@ export const createSlotsRepository = (db: Db) => {
 		`DELETE FROM alerts WHERE starts_at < :before`,
 	);
 
-	const listSlotStartTimes = (target: WatchTarget): string[] =>
+	const listSlotStartTimes = (target: SlotsModel["watchTarget"]): string[] =>
 		selectSlotStartTimes.all(target).map((row) => row.starts_at);
 
 	const insertSlots = db.transaction(
-		(target: WatchTarget, startTimes: string[], seenAt: string) => {
+		(
+			target: SlotsModel["watchTarget"],
+			startTimes: string[],
+			seenAt: string,
+		) => {
 			for (const startsAt of startTimes) {
 				insertSlot.run({ ...target, startsAt, seenAt });
 			}
@@ -81,7 +92,11 @@ export const createSlotsRepository = (db: Db) => {
 	);
 
 	const reconcileKnownSlots = db.transaction(
-		(target: WatchTarget, goneStartTimes: string[], seenAt: string) => {
+		(
+			target: SlotsModel["watchTarget"],
+			goneStartTimes: string[],
+			seenAt: string,
+		) => {
 			const params = {
 				...target,
 				goneStartTimes: JSON.stringify(goneStartTimes),
@@ -93,7 +108,11 @@ export const createSlotsRepository = (db: Db) => {
 	);
 
 	const insertAlerts = db.transaction(
-		(delivery: Delivery, target: WatchTarget, startTimes: string[]) => {
+		(
+			delivery: Delivery,
+			target: SlotsModel["watchTarget"],
+			startTimes: string[],
+		) => {
 			for (const [chatId, messageId] of delivery) {
 				for (const startsAt of startTimes) {
 					insertAlert.run({ ...target, chatId, messageId, startsAt });
@@ -103,7 +122,7 @@ export const createSlotsRepository = (db: Db) => {
 	);
 
 	const listAlertMessagesToEdit = (
-		target: WatchTarget,
+		target: SlotsModel["watchTarget"],
 		startTimes: string[],
 	): { chatId: ChatId; messageId: MessageId }[] =>
 		selectAlertMessages

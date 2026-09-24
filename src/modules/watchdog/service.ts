@@ -1,9 +1,9 @@
-import { ENV } from "varlock/env";
 import { FreshaError, type FreshaService } from "@/modules/fresha";
 import {
 	bookingLinks,
 	formatNewSlotsMessage,
 	formatUpdatedMessage,
+	type SlotsConfig,
 	type SlotsRepository,
 	slotKey,
 	watchTarget,
@@ -19,6 +19,12 @@ import { formatWallClock } from "@/utils/date";
 import { log } from "@/utils/logger";
 import { sleep as defaultSleep, type Sleep } from "@/utils/sleep";
 
+export type WatchdogConfig = SlotsConfig & {
+	locationId: string;
+	daysAhead: number;
+	failureThreshold: number;
+};
+
 export type WatchdogDeps = {
 	repo: SlotsRepository;
 	fresha: Pick<FreshaService, "listSlots" | "rateLimitedUntil">;
@@ -29,6 +35,7 @@ export type WatchdogDeps = {
 		messageId: MessageId,
 		message: Message,
 	) => Promise<boolean>;
+	config: WatchdogConfig;
 	now?: () => Temporal.Instant;
 	sleep?: Sleep;
 };
@@ -66,8 +73,9 @@ export type CheckResult =
 	| { ok: false; skipped?: true };
 
 export const createWatchdogService = (deps: WatchdogDeps) => {
-	const { repo } = deps;
-	const target = watchTarget();
+	const { repo, config } = deps;
+	const target = watchTarget(config);
+	const links = bookingLinks(config);
 	let failures = 0;
 	let rateLimitAnnounced = false;
 
@@ -76,7 +84,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		rateLimitAnnounced = true;
 
 		const pause = until
-			? ` until ${formatWallClock(until, ENV.SALON_TIME_ZONE).slice(11)}`
+			? ` until ${formatWallClock(until, config.timeZone).slice(11)}`
 			: "";
 		await deps.notifyAdmin({
 			text: `⏸ Fresha rate limited. Checks paused${pause}`,
@@ -89,7 +97,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 			await announceRateLimit(deps.fresha.rateLimitedUntil());
 		log.warn({ failures, err: error.message }, "watchdog check failed");
 
-		if (failures === ENV.FAILURE_ALERT_THRESHOLD) {
+		if (failures === config.failureThreshold) {
 			await deps.notify({
 				text: escapeHtml(
 					`Fresha API error (${failures} checks in a row): ${error.message}`,
@@ -106,7 +114,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 				text: "▶️ Fresha rate limit lifted, checks resumed",
 			});
 		}
-		if (failures >= ENV.FAILURE_ALERT_THRESHOLD) {
+		if (failures >= config.failureThreshold) {
 			await deps.notify({
 				text: `Fresha OK again after ${failures} failed checks`,
 			});
@@ -119,7 +127,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		const seenAt = now.toString({
 			fractionalSecondDigits: 3,
 		});
-		const salonNow = formatWallClock(now, ENV.SALON_TIME_ZONE);
+		const salonNow = formatWallClock(now, config.timeZone);
 
 		repo.deleteAlertsBefore(salonNow);
 
@@ -136,10 +144,10 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		const slots = await retry(
 			() =>
 				deps.fresha.listSlots(
-					String(ENV.FRESHA_LOCATION_ID),
-					ENV.FRESHA_SERVICE_ID,
-					ENV.FRESHA_EMPLOYEE_ID,
-					ENV.DAYS_AHEAD,
+					config.locationId,
+					config.serviceId,
+					config.employeeId,
+					config.daysAhead,
 				),
 			RETRY_ATTEMPTS,
 			deps.sleep,
@@ -162,7 +170,6 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		repo.reconcileKnownSlots(target, goneStartTimes, seenAt);
 
 		const live = new Set(current.keys());
-		const links = bookingLinks();
 		for (const { chatId, messageId } of affected) {
 			const edited = await deps.edit(
 				chatId,

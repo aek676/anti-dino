@@ -4,7 +4,11 @@ import { ENV } from "varlock/env";
 import { book } from "@/modules/book";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
-import { createSlotsRepository, createSlotsService } from "@/modules/slots";
+import {
+	createSlotsRepository,
+	createSlotsService,
+	type SlotsConfig,
+} from "@/modules/slots";
 import {
 	createSubscribersRepository,
 	createTelegramService,
@@ -24,11 +28,20 @@ const telegramService = createTelegramService({
 	adminChatId: ENV.ADMIN_CHAT_ID,
 });
 
+const slotsConfig: SlotsConfig = {
+	employeeId: ENV.FRESHA_EMPLOYEE_ID,
+	serviceId: ENV.FRESHA_SERVICE_ID,
+	salonUrl: ENV.FRESHA_BOOKING_URL,
+	publicUrl: ENV.PUBLIC_URL,
+	timeZone: ENV.SALON_TIME_ZONE,
+};
+
 const slotsRepository = createSlotsRepository(db);
 
 const slotsService = createSlotsService({
 	repo: slotsRepository,
 	send: telegramService.send,
+	config: slotsConfig,
 });
 
 const freshaService = createFreshaService(fetch, {
@@ -51,6 +64,12 @@ const app = new Elysia()
 			notify: telegramService.notify,
 			notifyAdmin: telegramService.notifyAdmin,
 			edit: telegramService.edit,
+			config: {
+				...slotsConfig,
+				locationId: String(ENV.FRESHA_LOCATION_ID),
+				daysAhead: ENV.DAYS_AHEAD,
+				failureThreshold: ENV.FAILURE_ALERT_THRESHOLD,
+			},
 		}),
 	)
 	.use(book({ fresha: freshaService }))
