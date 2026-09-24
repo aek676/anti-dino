@@ -37,6 +37,13 @@ describe("book service", () => {
 					return Promise.resolve(booking);
 				},
 			},
+			config: {
+				locationId: "1",
+				locationSlug: "test-salon",
+				serviceId: "test",
+				employeeId: 1234,
+				timeZone: "Europe/Madrid",
+			},
 			now: () => clock,
 		});
 

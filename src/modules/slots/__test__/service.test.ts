@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ENV } from "varlock/env";
 import type { Message } from "@/modules/telegram";
 import { type Db, openDatabase } from "@/utils/db";
-import { watchTarget } from "../model";
 import { createSlotsRepository } from "../repository";
-import { createSlotsService } from "../service";
+import {
+	bookingLinks,
+	createSlotsService,
+	type SlotsConfig,
+	watchTarget,
+} from "../service";
 
 const SEEN_AT = "2026-09-14T09:00:00.000Z";
 const MESSAGE_ID = 900;
@@ -14,16 +17,23 @@ describe("slots service", () => {
 	let sent: { chatId: number; message: Message }[];
 	let clock: Temporal.Instant;
 	let delivered: boolean;
-	const target = watchTarget();
-	const bookButton = [
-		[{ label: "Book on Fresha", url: ENV.FRESHA_BOOKING_URL }],
-	];
+	const config: SlotsConfig = {
+		employeeId: 1,
+		serviceId: "sv:1",
+		salonUrl: "https://salon.test",
+		slotUrl: (startsAt) => `https://app.test/book/${startsAt}`,
+		timeZone: "Europe/Madrid",
+	};
+	const target = watchTarget(config);
+	const links = bookingLinks(config);
+	const bookButton = [[{ label: "Book on Fresha", url: links.salon }]];
 	const link = (key: string) =>
-		`<a href="${ENV.PUBLIC_URL}/book/${key}">${key.slice(11)}</a>`;
+		`<a href="${links.slot(key)}">${key.slice(11)}</a>`;
 
 	const service = () =>
 		createSlotsService({
 			repo: createSlotsRepository(db),
+			config,
 			now: () => clock,
 			send: (chatId, message) => {
 				sent.push({ chatId, message });

@@ -57,7 +57,8 @@
 						"paths": {
 							"pino": "Use the shared logger from @/utils/logger.",
 							"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
-							"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db."
+							"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db.",
+							"varlock/env": "Only @/modules/app reads ENV: receive what you need through config or deps."
 						},
 						"patterns": [
 							{
@@ -191,7 +192,8 @@
 								"paths": {
 									"pino": "Use the shared logger from @/utils/logger.",
 									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
-									"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db."
+									"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db.",
+									"varlock/env": "Only @/modules/app reads ENV: receive what you need through config or deps."
 								},
 								"patterns": [
 									{
@@ -224,7 +226,8 @@
 								"paths": {
 									"pino": "Use the shared logger from @/utils/logger.",
 									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
-									"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db."
+									"bun:sqlite": "Open databases through @/utils/db (openDatabase, connectDatabase) and type them as Db.",
+									"varlock/env": "Only @/modules/app reads ENV: receive what you need through config or deps."
 								},
 								"patterns": [
 									{
@@ -270,7 +273,8 @@
 							"options": {
 								"paths": {
 									"pino": "Use the shared logger from @/utils/logger.",
-									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger."
+									"@bogeychan/elysia-logger": "Use the shared logger from @/utils/logger.",
+									"varlock/env": "Only @/modules/app reads ENV: receive what you need through config or deps."
 								},
 								"patterns": [
 									{

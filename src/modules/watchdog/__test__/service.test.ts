@@ -1,22 +1,37 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ENV } from "varlock/env";
 import { FreshaError, type FreshaModel } from "@/modules/fresha";
-import { createSlotsRepository } from "@/modules/slots";
+import {
+	bookingLinks,
+	createSlotsRepository,
+	watchTarget,
+} from "@/modules/slots";
 import type { Message } from "@/modules/telegram";
 import { type Db, openDatabase } from "@/utils/db";
-import { createWatchdogService, retry } from "../service";
+import { createWatchdogService, retry, type WatchdogConfig } from "../service";
 
 type Slot = FreshaModel["slot"];
 
-const employeeId = String(ENV.FRESHA_EMPLOYEE_ID);
-const serviceId = ENV.FRESHA_SERVICE_ID;
+const config: WatchdogConfig = {
+	employeeId: 1,
+	serviceId: "sv:1",
+	salonUrl: "https://salon.test",
+	slotUrl: (startsAt) => `https://app.test/book/${startsAt}`,
+	timeZone: "Europe/Madrid",
+	locationId: "1",
+	daysAhead: 31,
+	failureThreshold: 5,
+	checkIntervalMinutes: 5,
+};
+
+const target = watchTarget(config);
+const links = bookingLinks(config);
 
 const slotA: Slot = { date: "2026-09-17", time: "11:30" };
 const slotB: Slot = { date: "2026-09-17", time: "11:45" };
 const slotC: Slot = { date: "2026-09-18", time: "10:00" };
 
 const link = (key: string) =>
-	`<a href="${ENV.PUBLIC_URL}/book/${key}">${key.slice(11)}</a>`;
+	`<a href="${links.slot(key)}">${key.slice(11)}</a>`;
 
 const DEFAULT_COOLDOWN_SECONDS = 15 * 60;
 
@@ -132,9 +147,7 @@ describe("check", () => {
 	let sent: Message[];
 	let edited: { chatId: number; messageId: number; message: Message }[];
 	const chatId = 42;
-	const bookButton = [
-		[{ label: "Book on Fresha", url: ENV.FRESHA_BOOKING_URL }],
-	];
+	const bookButton = [[{ label: "Book on Fresha", url: links.salon }]];
 	const notify = (message: Message) => {
 		sent.push(message);
 		return Promise.resolve(new Map([[chatId, sent.length]]));
@@ -158,6 +171,7 @@ describe("check", () => {
 		rateLimitedUntil: () => Temporal.Instant | null;
 	}) =>
 		createWatchdogService({
+			config,
 			repo: createSlotsRepository(db),
 			fresha,
 			notify,
@@ -172,7 +186,7 @@ describe("check", () => {
 			.query<{ n: number }, [string, string]>(
 				"SELECT COUNT(*) AS n FROM slots WHERE employee_id = ? AND service_id = ? AND gone_at IS NULL",
 			)
-			.get(employeeId, serviceId)?.n ?? 0;
+			.get(target.employeeId, target.serviceId)?.n ?? 0;
 
 	const history = () =>
 		db
@@ -392,7 +406,7 @@ describe("check", () => {
 		expect(countSlots()).toBe(1);
 	});
 
-	const threshold = ENV.FAILURE_ALERT_THRESHOLD;
+	const threshold = config.failureThreshold;
 
 	test("retries a transient failure a few times and stays silent", async () => {
 		const fresha = failing("HTTP 503");
@@ -565,6 +579,7 @@ describe("check", () => {
 	test("does not persist when notify fails, so the next run alerts again", async () => {
 		const fresha = fake([slotA]);
 		const broken = createWatchdogService({
+			config,
 			repo: createSlotsRepository(db),
 			fresha,
 			now,

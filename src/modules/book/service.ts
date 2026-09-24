@@ -1,22 +1,34 @@
-import { ENV } from "varlock/env";
 import { FreshaError, type FreshaService } from "@/modules/fresha";
 import { formatWallClock } from "@/utils/date";
 import { log } from "@/utils/logger";
 import { type BookOutcome, bookingPageUrl, parseSlot } from "./model";
 
+export type BookConfig = {
+	locationId: string;
+	locationSlug: string;
+	serviceId: string;
+	employeeId: number;
+	timeZone: string;
+};
+
 export type BookDeps = {
 	fresha: Pick<FreshaService, "prepareBooking">;
+	config: BookConfig;
 	now?: () => Temporal.Instant;
 };
 
 export type BookResult = { url: string; outcome: BookOutcome };
 
 export const createBookService = (deps: BookDeps) => {
+	const { config } = deps;
+	const pageUrl = (query: Record<string, string>) =>
+		bookingPageUrl(config.locationSlug, query);
+
 	// Lands on the services screen; only used when no cart could be prepared.
 	const fallbackUrl = (date?: string) =>
-		bookingPageUrl({
-			offerItems: ENV.FRESHA_SERVICE_ID,
-			employeeId: String(ENV.FRESHA_EMPLOYEE_ID),
+		pageUrl({
+			offerItems: config.serviceId,
+			employeeId: String(config.employeeId),
 			...(date && { preferredDate: date }),
 		});
 
@@ -26,22 +38,22 @@ export const createBookService = (deps: BookDeps) => {
 		const slot = parseSlot(raw);
 		const salonNow = formatWallClock(
 			(deps.now ?? Temporal.Now.instant)(),
-			ENV.SALON_TIME_ZONE,
+			config.timeZone,
 		);
 		if (!slot || raw < salonNow)
 			return { url: fallbackUrl(), outcome: "invalid" };
 
 		const booking = await deps.fresha.prepareBooking(
-			String(ENV.FRESHA_LOCATION_ID),
-			ENV.FRESHA_SERVICE_ID,
-			ENV.FRESHA_EMPLOYEE_ID,
+			config.locationId,
+			config.serviceId,
+			config.employeeId,
 			slot,
 		);
 		if (booking instanceof FreshaError)
 			return { url: fallbackUrl(slot.date), outcome: "error", error: booking };
 
 		return {
-			url: bookingPageUrl({ cartId: booking.cartId }),
+			url: pageUrl({ cartId: booking.cartId }),
 			outcome: booking.selected ? "slot" : "day",
 		};
 	};
