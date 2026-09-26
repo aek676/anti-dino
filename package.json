@@ -18,6 +18,8 @@
   "dependencies": {
     "@bogeychan/elysia-logger": "^0.1.10",
     "@elysia/cron": "^1.4.2",
+    "@elysiajs/html": "^1.4.2",
+    "@kitajs/html": "^4.2.13",
     "@varlock/bitwarden-plugin": "^2.0.1",
     "elysia": "^1.4.30",
     "grammy": "^1.46.0",

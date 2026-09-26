@@ -1,3 +1,4 @@
+import { html } from "@elysiajs/html";
 import { Elysia, t } from "elysia";
 import { openInFreshaPage } from "./page";
 import { type BookDeps, createBookService } from "./service";
@@ -20,13 +21,12 @@ const IOS = /iPhone|iPad|iPod/;
 export const book = (deps: BookDeps) => {
 	const bookService = createBookService(deps);
 
-	return new Elysia({ name: "book" }).get(
+	return new Elysia({ name: "book" }).use(html({ autoDetect: false })).get(
 		`${BOOK_PATH}/:slot`,
-		async ({ params, headers, redirect, set }) => {
+		async ({ params, headers, redirect, html }) => {
 			const { url } = await bookService.resolve(params.slot);
 			if (IOS.test(headers["user-agent"] ?? "")) {
-				set.headers["content-type"] = "text/html; charset=utf-8";
-				return openInFreshaPage(url);
+				return html(openInFreshaPage(url));
 			}
 			return redirect(url, 302);
 		},
