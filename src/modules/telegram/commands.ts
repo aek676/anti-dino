@@ -4,12 +4,11 @@ import type { ChatId } from "./model";
 
 export type CommandsDeps = {
 	register: (chatId: ChatId) => void;
-	subscribe: (chatId: ChatId) => void;
-	unsubscribe: (chatId: ChatId) => void;
+	subscribe: (chatId: ChatId) => boolean;
+	unsubscribe: (chatId: ChatId) => boolean;
 	sendSlots: (chatId: ChatId) => Promise<void>;
 };
 
-// /start is left out on purpose: Telegram sends it when the chat opens, it is not a menu option.
 export const COMMANDS = [
 	{ command: "slots", description: "See the slots available right now" },
 	{ command: "subscribe", description: "Turn alerts on" },
@@ -34,14 +33,21 @@ export const registerCommands = (bot: Bot, deps: CommandsDeps) => {
 	bot.command("slots", (ctx) => deps.sendSlots(ctx.chatId));
 
 	bot.command("subscribe", async (ctx) => {
-		deps.subscribe(ctx.chatId);
+		if (!deps.subscribe(ctx.chatId)) {
+			await ctx.reply("Alerts were already on. Send /slots to see the slots.");
+			return;
+		}
 		await ctx.reply("Alerts on.");
 		await deps.sendSlots(ctx.chatId);
 	});
 
 	bot.command("unsubscribe", (ctx) => {
-		deps.unsubscribe(ctx.chatId);
-		return ctx.reply("Alerts off. Send /subscribe to turn them back on.");
+		const changed = deps.unsubscribe(ctx.chatId);
+		return ctx.reply(
+			changed
+				? "Alerts off. Send /subscribe to turn them back on."
+				: "Alerts were already off. Send /subscribe to turn them on.",
+		);
 	});
 
 	bot.on("my_chat_member", (ctx) => {

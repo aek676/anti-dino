@@ -126,6 +126,45 @@ describe("telegram commands", () => {
 		]);
 	});
 
+	test("/subscribe says the alerts were already on without resending the slots", async () => {
+		const { commands } = setup();
+		repo.subscribe(10);
+		const { ctx, replies } = fakeCtx(10);
+
+		await commands.get("subscribe")?.(ctx);
+
+		expect(repo.listSubscribers()).toEqual([10]);
+		expect(replies).toEqual([
+			"Alerts were already on. Send /slots to see the slots.",
+		]);
+		expect(slotsSentTo).toEqual([]);
+	});
+
+	test("/unsubscribe says the alerts were already off", async () => {
+		const { commands } = setup();
+		repo.subscribe(10);
+		repo.unsubscribe(10);
+		const { ctx, replies } = fakeCtx(10);
+
+		await commands.get("unsubscribe")?.(ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
+		expect(replies).toEqual([
+			"Alerts were already off. Send /subscribe to turn them on.",
+		]);
+	});
+
+	test("/unsubscribe from a chat that never started says the alerts were already off", async () => {
+		const { commands } = setup();
+		const { ctx, replies } = fakeCtx(10);
+
+		await commands.get("unsubscribe")?.(ctx);
+
+		expect(replies).toEqual([
+			"Alerts were already off. Send /subscribe to turn them on.",
+		]);
+	});
+
 	test("blocking the bot turns the alerts off", async () => {
 		const { updates } = setup();
 		repo.subscribe(10);
