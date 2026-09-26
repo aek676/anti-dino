@@ -147,7 +147,7 @@ describe("check", () => {
 	let sent: Message[];
 	let edited: { chatId: number; messageId: number; message: Message }[];
 	const chatId = 42;
-	const bookButton = [[{ label: "Book on Fresha", url: links.salon }]];
+	const bookButton = [[{ label: "Reservar en Fresha", url: links.salon }]];
 	const notify = (message: Message) => {
 		sent.push(message);
 		return Promise.resolve(new Map([[chatId, sent.length]]));
@@ -230,8 +230,8 @@ describe("check", () => {
 		expect(sent).toHaveLength(1);
 		expect(sent[0]).toEqual({
 			text: [
-				"<b>🟢 2 new slots</b>",
-				`<b>Thu, Sep 17</b>\n${link("2026-09-17T11:30")}  ${link("2026-09-17T11:45")}`,
+				"<b>🟢 2 citas nuevas de Corte de pelo</b>",
+				`<b>Jue, 17 sept</b>\n${link("2026-09-17T11:30")}  ${link("2026-09-17T11:45")}`,
 			].join("\n\n"),
 			buttons: bookButton,
 		});
@@ -248,9 +248,9 @@ describe("check", () => {
 
 		expect(sent[0]?.text).toBe(
 			[
-				"<b>🟢 3 new slots</b>",
-				`<b>Thu, Sep 17</b>\n${link("2026-09-17T11:30")}  ${link("2026-09-17T11:45")}`,
-				`<b>Fri, Sep 18</b>\n${link("2026-09-18T10:00")}`,
+				"<b>🟢 3 citas nuevas de Corte de pelo</b>",
+				`<b>Jue, 17 sept</b>\n${link("2026-09-17T11:30")}  ${link("2026-09-17T11:45")}`,
+				`<b>Vie, 18 sept</b>\n${link("2026-09-18T10:00")}`,
 			].join("\n\n"),
 		);
 	});
@@ -277,9 +277,9 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sent).toHaveLength(2);
-		expect(sent[1]?.text).toContain("<b>🟢 1 new slot</b>");
+		expect(sent[1]?.text).toContain("<b>🟢 1 cita nueva de Corte de pelo</b>");
 		expect(sent[1]?.text).toContain(
-			`<b>Fri, Sep 18</b>\n${link("2026-09-18T10:00")}`,
+			`<b>Vie, 18 sept</b>\n${link("2026-09-18T10:00")}`,
 		);
 		expect(sent[1]?.text).not.toContain("11:30");
 		expect(countSlots()).toBe(3);
@@ -300,8 +300,8 @@ describe("check", () => {
 		expect(edited[0]?.messageId).toBe(1);
 		expect(edited[0]?.message).toEqual({
 			text: [
-				"<b>🟡 1 of 2 slots left</b>",
-				`<b>Thu, Sep 17</b>\n<s>11:30</s>  ${link("2026-09-17T11:45")}`,
+				"<b>🟡 Queda 1 de 2 citas de Corte de pelo</b>",
+				`<b>Jue, 17 sept</b>\n<s>11:30</s>  ${link("2026-09-17T11:45")}`,
 			].join("\n\n"),
 			buttons: bookButton,
 		});
@@ -317,15 +317,15 @@ describe("check", () => {
 		expect(edited.map((call) => call.messageId)).toEqual([1, 2]);
 		expect(edited[0]?.message).toEqual({
 			text: [
-				"<b>⚪ No slots left from this alert</b>",
-				"<b>Thu, Sep 17</b>\n<s>11:30</s>",
+				"<b>⚪ Ya no queda ninguna cita de esta alerta</b>",
+				"<b>Jue, 17 sept</b>\n<s>11:30</s>",
 			].join("\n\n"),
 			buttons: [],
 		});
 		expect(edited[1]?.message).toEqual({
 			text: [
-				"<b>⚪ No slots left from this alert</b>",
-				"<b>Fri, Sep 18</b>\n<s>10:00</s>",
+				"<b>⚪ Ya no queda ninguna cita de esta alerta</b>",
+				"<b>Vie, 18 sept</b>\n<s>10:00</s>",
 			].join("\n\n"),
 			buttons: [],
 		});
@@ -381,7 +381,7 @@ describe("check", () => {
 
 		expect(edited).toHaveLength(1);
 		expect(sent).toHaveLength(2);
-		expect(sent[1]?.text).toContain("1 new slot");
+		expect(sent[1]?.text).toContain("1 cita nueva de Corte de pelo");
 	});
 
 	test("forgets alerts once their slot time has passed", async () => {
@@ -429,7 +429,7 @@ describe("check", () => {
 		await watchdog.check();
 		expect(sent).toHaveLength(1);
 		expect(sent[0]).toEqual({
-			text: `Fresha API error (${threshold} checks in a row): HTTP 503`,
+			text: `Error en la API de Fresha (${threshold} comprobaciones seguidas): HTTP 503`,
 		});
 
 		await watchdog.check();
@@ -445,10 +445,10 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(3);
 		expect(sent[1]).toEqual({
-			text: `Fresha OK again after ${threshold + 1} failed checks`,
+			text: `Fresha vuelve a funcionar tras ${threshold + 1} comprobaciones fallidas`,
 		});
 		expect(sent[2]?.text).toContain(
-			`<b>Thu, Sep 17</b>\n${link("2026-09-17T11:30")}`,
+			`<b>Jue, 17 sept</b>\n${link("2026-09-17T11:30")}`,
 		);
 	});
 
@@ -496,7 +496,7 @@ describe("check", () => {
 		expect(await watchdog.check()).toEqual({ ok: false, skipped: true });
 		expect(fresha.calls).toBe(0);
 		expect(sentToAdmin).toEqual([
-			"⏸ Fresha rate limited. Checks paused until 12:10",
+			"⏸ Fresha nos ha limitado. Comprobaciones en pausa hasta las 12:10",
 		]);
 
 		clock = clock.add({ seconds: 600 });
@@ -506,8 +506,8 @@ describe("check", () => {
 			goneSlots: [],
 		});
 		expect(sentToAdmin).toEqual([
-			"⏸ Fresha rate limited. Checks paused until 12:10",
-			"▶️ Fresha rate limit lifted, checks resumed",
+			"⏸ Fresha nos ha limitado. Comprobaciones en pausa hasta las 12:10",
+			"▶️ Fresha ya no nos limita, comprobaciones reanudadas",
 		]);
 		expect(sent).toHaveLength(1);
 	});
@@ -538,7 +538,7 @@ describe("check", () => {
 
 		await watchdog.check();
 		expect(sentToAdmin).toEqual([
-			"⏸ Fresha rate limited. Checks paused until 12:11",
+			"⏸ Fresha nos ha limitado. Comprobaciones en pausa hasta las 12:11",
 		]);
 
 		clock = clock.add({ seconds: 300 });
@@ -551,8 +551,8 @@ describe("check", () => {
 		clock = clock.add({ seconds: 711 });
 		await watchdog.check();
 		expect(sentToAdmin).toEqual([
-			"⏸ Fresha rate limited. Checks paused until 12:11",
-			"▶️ Fresha rate limit lifted, checks resumed",
+			"⏸ Fresha nos ha limitado. Comprobaciones en pausa hasta las 12:11",
+			"▶️ Fresha ya no nos limita, comprobaciones reanudadas",
 		]);
 		expect(sent).toEqual([]);
 	});
@@ -561,7 +561,7 @@ describe("check", () => {
 		await service(failing("HTTP 429", 429)).check();
 
 		expect(sentToAdmin).toEqual([
-			"⏸ Fresha rate limited. Checks paused until 12:15",
+			"⏸ Fresha nos ha limitado. Comprobaciones en pausa hasta las 12:15",
 		]);
 	});
 

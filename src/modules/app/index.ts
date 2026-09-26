@@ -95,9 +95,9 @@ const app = new Elysia()
 				webhookPath: ENV.WEBHOOK_PATH,
 				webhookSecret: ENV.TELEGRAM_WEBHOOK_SECRET,
 			},
+			register: subscribersRepository.register,
 			subscribe: subscribersRepository.subscribe,
 			unsubscribe: subscribersRepository.unsubscribe,
-			isSubscribed: subscribersRepository.isSubscribed,
 			sendSlots: slotsService.sendCurrent,
 		}),
 	)

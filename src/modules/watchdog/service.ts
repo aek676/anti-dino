@@ -85,10 +85,10 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		rateLimitAnnounced = true;
 
 		const pause = until
-			? ` until ${formatWallClock(until, config.timeZone).slice(11)}`
+			? ` hasta las ${formatWallClock(until, config.timeZone).slice(11)}`
 			: "";
 		await deps.notifyAdmin({
-			text: `⏸ Fresha rate limited. Checks paused${pause}`,
+			text: `⏸ Fresha nos ha limitado. Comprobaciones en pausa${pause}`,
 		});
 	};
 
@@ -101,7 +101,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		if (failures === config.failureThreshold) {
 			await deps.notify({
 				text: escapeHtml(
-					`Fresha API error (${failures} checks in a row): ${error.message}`,
+					`Error en la API de Fresha (${failures} comprobaciones seguidas): ${error.message}`,
 				),
 			});
 		}
@@ -112,12 +112,12 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		if (rateLimitAnnounced) {
 			rateLimitAnnounced = false;
 			await deps.notifyAdmin({
-				text: "▶️ Fresha rate limit lifted, checks resumed",
+				text: "▶️ Fresha ya no nos limita, comprobaciones reanudadas",
 			});
 		}
 		if (failures >= config.failureThreshold) {
 			await deps.notify({
-				text: `Fresha OK again after ${failures} failed checks`,
+				text: `Fresha vuelve a funcionar tras ${failures} comprobaciones fallidas`,
 			});
 		}
 		failures = 0;

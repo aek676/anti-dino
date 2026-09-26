@@ -26,7 +26,7 @@ describe("slots service", () => {
 	};
 	const target = watchTarget(config);
 	const links = bookingLinks(config);
-	const bookButton = [[{ label: "Book on Fresha", url: links.salon }]];
+	const bookButton = [[{ label: "Reservar en Fresha", url: links.salon }]];
 	const link = (key: string) =>
 		`<a href="${links.slot(key)}">${key.slice(11)}</a>`;
 
@@ -64,9 +64,9 @@ describe("slots service", () => {
 				chatId: 7,
 				message: {
 					text: [
-						"<b>🟢 2 slots available</b>",
-						`<b>Thu, Sep 17</b>\n${link("2026-09-17T11:30")}`,
-						`<b>Fri, Sep 18</b>\n${link("2026-09-18T10:00")}`,
+						"<b>🟢 2 citas disponibles de Corte de pelo</b>",
+						`<b>Jue, 17 sept</b>\n${link("2026-09-17T11:30")}`,
+						`<b>Vie, 18 sept</b>\n${link("2026-09-18T10:00")}`,
 					].join("\n\n"),
 					buttons: bookButton,
 				},
@@ -116,7 +116,7 @@ describe("slots service", () => {
 			{
 				chatId: 7,
 				message: {
-					text: "No slots available right now. I'll message you as soon as one opens up.",
+					text: "No hay citas de Corte de pelo disponibles ahora mismo. Te escribo en cuanto se libere una.",
 				},
 			},
 		]);

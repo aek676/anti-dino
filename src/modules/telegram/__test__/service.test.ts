@@ -25,7 +25,22 @@ type Options = {
 
 const hello: Message = { text: "hello" };
 
-const fakeBot = (failFor: Set<number> = new Set(), editError?: unknown) => {
+const blocked = new GrammyError(
+	"Call to 'sendMessage' failed!",
+	{
+		ok: false,
+		error_code: 403,
+		description: "Forbidden: bot was blocked by the user",
+	},
+	"sendMessage",
+	{},
+);
+
+const fakeBot = (
+	failFor: Set<number> = new Set(),
+	editError?: unknown,
+	sendError: unknown = new Error("blocked"),
+) => {
 	const sent: { chatId: number; text: string; options?: Options }[] = [];
 	const edited: {
 		chatId: number;
@@ -37,7 +52,7 @@ const fakeBot = (failFor: Set<number> = new Set(), editError?: unknown) => {
 	const bot = {
 		api: {
 			sendMessage: (chatId: number, text: string, options?: Options) => {
-				if (failFor.has(chatId)) return Promise.reject(new Error("blocked"));
+				if (failFor.has(chatId)) return Promise.reject(sendError);
 				sent.push({ chatId, text, options });
 				messageId += 1;
 				return Promise.resolve({ message_id: messageId });
@@ -127,6 +142,27 @@ describe("telegram service", () => {
 		await service.notify(hello);
 
 		expect(sent.map((m) => m.chatId).toSorted()).toEqual([ADMIN, 20]);
+	});
+
+	test("notify turns the alerts off for a chat that blocked the bot", async () => {
+		const { bot } = fakeBot(new Set([10]), undefined, blocked);
+		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });
+		repo.subscribe(10);
+		repo.subscribe(20);
+
+		await service.notify(hello);
+
+		expect(repo.listSubscribers()).toEqual([20]);
+	});
+
+	test("notify keeps the alerts on when a send fails for another reason", async () => {
+		const { bot } = fakeBot(new Set([10]));
+		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });
+		repo.subscribe(10);
+
+		await service.notify(hello);
+
+		expect(repo.listSubscribers()).toEqual([10]);
 	});
 
 	test("notify throws when nobody could be reached", () => {

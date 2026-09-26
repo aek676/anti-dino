@@ -57,6 +57,25 @@ describe("migrate", () => {
 		old.close();
 	});
 
+	test("keeps the existing subscribers with the alerts on", () => {
+		const old = connectDatabase(":memory:");
+		for (const migration of migrations.slice(0, 5)) migration.up(old);
+		old.run("PRAGMA user_version = 5");
+		old.run("INSERT INTO subscribers VALUES (10, '2026-09-14T10:00:00.000Z')");
+
+		migrate(old);
+
+		expect(old.query("SELECT * FROM subscribers").all()).toEqual([
+			{
+				chat_id: 10,
+				created_at: "2026-09-14T10:00:00.000Z",
+				notify: 1,
+				updated_at: null,
+			},
+		]);
+		old.close();
+	});
+
 	test("migration names are unique", () => {
 		const names = migrations.map((migration) => migration.name);
 		expect(new Set(names).size).toBe(names.length);

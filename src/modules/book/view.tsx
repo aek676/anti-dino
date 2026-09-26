@@ -3,11 +3,11 @@
  * redirect, so iPhones land here and tap through instead of being 302'd.
  */
 export const openInFreshaPage = (url: string) => (
-	<html lang="en">
+	<html lang="es">
 		<head>
 			<meta charset="utf-8" />
 			<meta name="viewport" content="width=device-width, initial-scale=1" />
-			<title>Open in Fresha</title>
+			<title>Abrir en Fresha</title>
 		</head>
 		<body
 			style={{
@@ -35,10 +35,10 @@ export const openInFreshaPage = (url: string) => (
 						textDecoration: "none",
 					}}
 				>
-					Open in Fresha
+					Abrir en Fresha
 				</a>
 				<p style={{ color: "#666", fontSize: "14px" }}>
-					Your hour is waiting in the cart.
+					Tu hora te espera en el carrito.
 				</p>
 			</main>
 		</body>

@@ -4,13 +4,17 @@ import type { ChatId, Delivery, Message, MessageId } from "./model";
 import type { SubscribersRepository } from "./repository";
 
 export type TelegramDeps = {
-	repo: Pick<SubscribersRepository, "listSubscribers">;
+	repo: Pick<SubscribersRepository, "listSubscribers" | "unsubscribe">;
 	adminChatId: number;
 	bot: Bot;
 };
 
 // Telegram sends 400 when the message or chat is gone and 403 when the bot is blocked.
+const BLOCKED = 403;
 const PERMANENT_ERROR_CODES = new Set([400, 403]);
+
+const isBlocked = (error: unknown) =>
+	error instanceof GrammyError && error.error_code === BLOCKED;
 
 const isPermanent = (error: unknown) =>
 	error instanceof GrammyError && PERMANENT_ERROR_CODES.has(error.error_code);
@@ -67,6 +71,10 @@ export const createTelegramService = (deps: TelegramDeps) => {
 			return message_id;
 		} catch (error) {
 			log.warn({ chatId, err: error }, "Failed to send message");
+			if (isBlocked(error)) {
+				deps.repo.unsubscribe(chatId);
+				log.info({ chatId }, "Unsubscribed chat that blocked the bot");
+			}
 		}
 	};
 

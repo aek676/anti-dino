@@ -8,45 +8,34 @@ import {
 } from "../repository";
 
 type Handler = (ctx: Context) => unknown;
-type Keyboard = {
-	inline_keyboard: { text: string; callback_data?: string }[][];
-};
 
 const fakeBot = () => {
 	const commands = new Map<string, Handler>();
-	const callbacks = new Map<string, Handler>();
+	const updates = new Map<string, Handler>();
 	const bot = {
 		command: (name: string, handler: Handler) => {
 			commands.set(name, handler);
 		},
-		callbackQuery: (data: string, handler: Handler) => {
-			callbacks.set(data, handler);
+		on: (filter: string, handler: Handler) => {
+			updates.set(filter, handler);
 		},
 	} as unknown as Bot;
-	return { bot, commands, callbacks };
+	return { bot, commands, updates };
 };
 
-const fakeCtx = (chatId: number) => {
+const fakeCtx = (chatId: number, memberStatus?: string) => {
 	const replies: string[] = [];
-	const keyboards: (Keyboard | undefined)[] = [];
-	const events: string[] = [];
+	const options: unknown[] = [];
 	const ctx = {
 		chatId,
-		reply: (text: string, options?: { reply_markup?: Keyboard }) => {
+		myChatMember: { new_chat_member: { status: memberStatus } },
+		reply: (text: string, replyOptions?: unknown) => {
 			replies.push(text);
-			keyboards.push(options?.reply_markup);
+			options.push(replyOptions);
 			return Promise.resolve();
 		},
-		answerCallbackQuery: () => {
-			events.push("answered");
-			return Promise.resolve(true);
-		},
-		editMessageReplyMarkup: () => {
-			events.push("button removed");
-			return Promise.resolve(true);
-		},
 	} as unknown as Context;
-	return { ctx, replies, keyboards, events };
+	return { ctx, replies, options };
 };
 
 describe("telegram commands", () => {
@@ -55,7 +44,7 @@ describe("telegram commands", () => {
 	let slotsSentTo: number[];
 
 	const setup = () => {
-		const { bot, commands, callbacks } = fakeBot();
+		const { bot, commands, updates } = fakeBot();
 		registerCommands(bot, {
 			...repo,
 			sendSlots: (chatId) => {
@@ -63,7 +52,7 @@ describe("telegram commands", () => {
 				return Promise.resolve();
 			},
 		});
-		return { commands, callbacks };
+		return { commands, updates };
 	};
 
 	beforeEach(() => {
@@ -75,42 +64,30 @@ describe("telegram commands", () => {
 		db.close();
 	});
 
-	test("/start welcomes a new chat with the commands and a start button", async () => {
+	test("/start subscribes a new chat, welcomes it and sends the current slots", async () => {
 		const { commands } = setup();
-		const { ctx, replies, keyboards } = fakeCtx(10);
+		const { ctx, replies, options } = fakeCtx(10);
+
+		await commands.get("start")?.(ctx);
+
+		expect(repo.listSubscribers()).toEqual([10]);
+		expect(replies).toHaveLength(1);
+		for (const { command } of COMMANDS)
+			expect(replies[0]).toContain(`/${command}`);
+		expect(replies[0]).not.toContain("/start");
+		expect(options[0]).toEqual({ parse_mode: "HTML" });
+		expect(slotsSentTo).toEqual([10]);
+	});
+
+	test("/start keeps the alerts off for a chat that turned them off", async () => {
+		const { commands } = setup();
+		repo.subscribe(10);
+		repo.unsubscribe(10);
+		const { ctx } = fakeCtx(10);
 
 		await commands.get("start")?.(ctx);
 
 		expect(repo.listSubscribers()).toEqual([]);
-		expect(slotsSentTo).toEqual([]);
-		expect(replies).toHaveLength(1);
-		for (const { command } of COMMANDS)
-			expect(replies[0]).toContain(`/${command}`);
-		expect(keyboards[0]?.inline_keyboard).toEqual([
-			[{ text: "🚀 Start", callback_data: "subscribe" }],
-		]);
-	});
-
-	test("the start button subscribes the chat and sends the current slots", async () => {
-		const { callbacks } = setup();
-		const { ctx, replies, events } = fakeCtx(10);
-
-		await callbacks.get("subscribe")?.(ctx);
-
-		expect(repo.listSubscribers()).toEqual([10]);
-		expect(events).toEqual(["answered", "button removed"]);
-		expect(replies).toEqual(["You have subscribed to notifications."]);
-		expect(slotsSentTo).toEqual([10]);
-	});
-
-	test("/start sends the current slots to a chat that already subscribed", async () => {
-		const { commands } = setup();
-		repo.subscribe(10);
-		const { ctx, replies } = fakeCtx(10);
-
-		await commands.get("start")?.(ctx);
-
-		expect(replies).toEqual([]);
 		expect(slotsSentTo).toEqual([10]);
 	});
 
@@ -123,14 +100,96 @@ describe("telegram commands", () => {
 		expect(slotsSentTo).toEqual([10]);
 	});
 
-	test("/stop unsubscribes the chat and confirms", async () => {
+	test("/subscribe turns the alerts on and sends the current slots", async () => {
+		const { commands } = setup();
+		repo.subscribe(10);
+		repo.unsubscribe(10);
+		const { ctx, replies } = fakeCtx(10);
+
+		await commands.get("subscribe")?.(ctx);
+
+		expect(repo.listSubscribers()).toEqual([10]);
+		expect(replies).toEqual(["Alertas activadas."]);
+		expect(slotsSentTo).toEqual([10]);
+	});
+
+	test("/unsubscribe turns the alerts off and confirms", async () => {
 		const { commands } = setup();
 		repo.subscribe(10);
 		const { ctx, replies } = fakeCtx(10);
 
-		await commands.get("stop")?.(ctx);
+		await commands.get("unsubscribe")?.(ctx);
 
 		expect(repo.listSubscribers()).toEqual([]);
-		expect(replies).toEqual(["You have unsubscribed from notifications."]);
+		expect(replies).toEqual([
+			"Alertas desactivadas. Envía /subscribe para volver a activarlas.",
+		]);
+	});
+
+	test("/subscribe says the alerts were already on without resending the slots", async () => {
+		const { commands } = setup();
+		repo.subscribe(10);
+		const { ctx, replies } = fakeCtx(10);
+
+		await commands.get("subscribe")?.(ctx);
+
+		expect(repo.listSubscribers()).toEqual([10]);
+		expect(replies).toEqual([
+			"Las alertas ya estaban activadas. Envía /slots para ver las citas.",
+		]);
+		expect(slotsSentTo).toEqual([]);
+	});
+
+	test("/unsubscribe says the alerts were already off", async () => {
+		const { commands } = setup();
+		repo.subscribe(10);
+		repo.unsubscribe(10);
+		const { ctx, replies } = fakeCtx(10);
+
+		await commands.get("unsubscribe")?.(ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
+		expect(replies).toEqual([
+			"Las alertas ya estaban desactivadas. Envía /subscribe para activarlas.",
+		]);
+	});
+
+	test("/unsubscribe from a chat that never started says the alerts were already off", async () => {
+		const { commands } = setup();
+		const { ctx, replies } = fakeCtx(10);
+
+		await commands.get("unsubscribe")?.(ctx);
+
+		expect(replies).toEqual([
+			"Las alertas ya estaban desactivadas. Envía /subscribe para activarlas.",
+		]);
+	});
+
+	test("blocking the bot turns the alerts off", async () => {
+		const { updates } = setup();
+		repo.subscribe(10);
+
+		await updates.get("my_chat_member")?.(fakeCtx(10, "kicked").ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
+	});
+
+	test("removing the bot from a group turns the alerts off", async () => {
+		const { updates } = setup();
+		repo.subscribe(10);
+
+		await updates.get("my_chat_member")?.(fakeCtx(10, "left").ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
+	});
+
+	test("unblocking the bot leaves the alerts as they were", async () => {
+		const { updates } = setup();
+		repo.subscribe(10);
+		repo.unsubscribe(10);
+
+		await updates.get("my_chat_member")?.(fakeCtx(10, "member").ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
 	});
 });

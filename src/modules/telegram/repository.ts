@@ -5,42 +5,43 @@ export type SubscribersRepository = ReturnType<
 	typeof createSubscribersRepository
 >;
 
+const now = () =>
+	Temporal.Now.instant().toString({ fractionalSecondDigits: 3 });
+
 export const createSubscribersRepository = (db: Db) => {
-	const insertSubscriber = db.query<
-		void,
-		{ chatId: number; createdAt: string }
-	>(
-		`INSERT OR IGNORE INTO subscribers (chat_id, created_at) VALUES (:chatId, :createdAt)`,
+	const insertSubscriber = db.query<void, { chatId: number; now: string }>(
+		`INSERT OR IGNORE INTO subscribers (chat_id, created_at, notify)
+		VALUES (:chatId, :now, 1)`,
 	);
 
-	const deleteSubscriber = db.query<void, { chatId: number }>(
-		`DELETE FROM subscribers WHERE chat_id = :chatId`,
+	const upsertSubscriber = db.query<void, { chatId: number; now: string }>(
+		`INSERT INTO subscribers (chat_id, created_at, notify)
+		VALUES (:chatId, :now, 1)
+		ON CONFLICT (chat_id) DO UPDATE SET notify = 1, updated_at = :now
+		WHERE notify = 0`,
 	);
 
-	const selectSubscriber = db.query<{ chat_id: number }, { chatId: number }>(
-		`SELECT chat_id FROM subscribers WHERE chat_id = :chatId`,
+	const muteSubscriber = db.query<void, { chatId: number; now: string }>(
+		`UPDATE subscribers SET notify = 0, updated_at = :now
+		WHERE chat_id = :chatId AND notify = 1`,
 	);
 
 	const selectSubscribers = db.query<{ chat_id: number }, []>(
-		`SELECT chat_id FROM subscribers`,
+		`SELECT chat_id FROM subscribers WHERE notify = 1`,
 	);
 
-	const subscribe = (chatId: ChatId) => {
-		insertSubscriber.run({
-			chatId,
-			createdAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
-		});
+	const register = (chatId: ChatId) => {
+		insertSubscriber.run({ chatId, now: now() });
 	};
 
-	const unsubscribe = (chatId: ChatId) => {
-		deleteSubscriber.run({ chatId });
-	};
+	const subscribe = (chatId: ChatId): boolean =>
+		upsertSubscriber.run({ chatId, now: now() }).changes > 0;
 
-	const isSubscribed = (chatId: ChatId) =>
-		selectSubscriber.get({ chatId }) !== null;
+	const unsubscribe = (chatId: ChatId): boolean =>
+		muteSubscriber.run({ chatId, now: now() }).changes > 0;
 
 	const listSubscribers = (): ChatId[] =>
 		selectSubscribers.all().map((row) => row.chat_id);
 
-	return { subscribe, unsubscribe, isSubscribed, listSubscribers };
+	return { register, subscribe, unsubscribe, listSubscribers };
 };
