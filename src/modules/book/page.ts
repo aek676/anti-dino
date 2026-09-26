@@ -3,7 +3,7 @@
  * redirect, so iPhones land here and tap through instead of being 302'd.
  */
 export const openInFreshaPage = (url: string): string => {
-	const href = url.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+	const href = Bun.escapeHTML(url);
 	return `<!doctype html>
 <html lang="en">
 <head>

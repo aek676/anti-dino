@@ -22,12 +22,11 @@ export const book = (deps: BookDeps) => {
 
 	return new Elysia({ name: "book" }).get(
 		`${BOOK_PATH}/:slot`,
-		async ({ params, headers, redirect }) => {
+		async ({ params, headers, redirect, set }) => {
 			const { url } = await bookService.resolve(params.slot);
 			if (IOS.test(headers["user-agent"] ?? "")) {
-				return new Response(openInFreshaPage(url), {
-					headers: { "content-type": "text/html; charset=utf-8" },
-				});
+				set.headers["content-type"] = "text/html; charset=utf-8";
+				return openInFreshaPage(url);
 			}
 			return redirect(url, 302);
 		},
