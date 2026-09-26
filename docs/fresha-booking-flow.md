@@ -78,6 +78,20 @@ Abrir después `…/booking?cartId=<uuid>` muestra la pantalla de horas con ese 
 (comprobado en Chromium, sep 2026). Los `action.id` son JSON determinista, así que se pueden construir
 sin leerlos de la respuesta anterior.
 
+## Abrir la app en iPhone
+
+iOS solo abre la app de Fresha desde un enlace a `fresha.com` que el usuario toca (universal link). Un
+302 hacia Fresha, un `meta refresh` o un `location.href` se quedan en el navegador. Por eso `/book`
+responde a los iPhone con una página con un botón «Open in Fresha» que apunta al carrito, y al resto con
+el 302. Comprobado el 26 sep 2026 desde Telegram en un iPhone con la app instalada: tanto ese botón como
+un enlace directo `…/booking?cartId=` abren la app en «Review and confirm» con la hora elegida, aunque el
+carrito se haya creado sin sesión.
+
+Crear los carritos al enviar la alerta y enlazar directamente al `cartId` ahorraría ese toque, pero un
+carrito sin tocar caduca en menos de un día (el creado el 25 sep ya no existía el 26; el mínimo medido
+son 9 h 30 min). Habría que renovarlos y editar los mensajes, y todos los suscriptores compartirían el
+mismo carrito. Un carrito caducado abre la pantalla de servicios vacía aunque la URL conserve el `cartId`.
+
 ## Rate limit
 
 Sondeo del 18 sep 2026 desde una IP doméstica: 76 `Initialize` en ~75 s pasaron con 200 y la ráfaga
