@@ -10,17 +10,20 @@ export type CommandsDeps = {
 };
 
 export const COMMANDS = [
-	{ command: "slots", description: "See the slots available right now" },
-	{ command: "subscribe", description: "Turn alerts on" },
-	{ command: "unsubscribe", description: "Turn alerts off" },
+	{ command: "slots", description: "Ver las citas disponibles ahora mismo" },
+	{ command: "subscribe", description: "Activar las alertas" },
+	{ command: "unsubscribe", description: "Desactivar las alertas" },
 ];
 
 const WELCOME = [
-	"<b>👋 Hi! I watch the salon's calendar and message you when a slot opens up.</b>",
+	[
+		"<b>👋 ¡Hola! Vigilo la agenda de Elvis y te aviso en cuanto se libera una cita de Corte de pelo.</b>",
+		"Así no te toca Dino y te ahorras el destrozo 🦖",
+	].join("\n"),
 	COMMANDS.map(
 		({ command, description }) => `/${command} - ${description.toLowerCase()}`,
 	).join("\n"),
-	"Alerts are on. These are the slots available right now:",
+	"Las alertas están activadas. Estas son las citas disponibles ahora mismo:",
 ].join("\n\n");
 
 export const registerCommands = (bot: Bot, deps: CommandsDeps) => {
@@ -34,10 +37,12 @@ export const registerCommands = (bot: Bot, deps: CommandsDeps) => {
 
 	bot.command("subscribe", async (ctx) => {
 		if (!deps.subscribe(ctx.chatId)) {
-			await ctx.reply("Alerts were already on. Send /slots to see the slots.");
+			await ctx.reply(
+				"Las alertas ya estaban activadas. Envía /slots para ver las citas.",
+			);
 			return;
 		}
-		await ctx.reply("Alerts on.");
+		await ctx.reply("Alertas activadas.");
 		await deps.sendSlots(ctx.chatId);
 	});
 
@@ -45,8 +50,8 @@ export const registerCommands = (bot: Bot, deps: CommandsDeps) => {
 		const changed = deps.unsubscribe(ctx.chatId);
 		return ctx.reply(
 			changed
-				? "Alerts off. Send /subscribe to turn them back on."
-				: "Alerts were already off. Send /subscribe to turn them on.",
+				? "Alertas desactivadas. Envía /subscribe para volver a activarlas."
+				: "Las alertas ya estaban desactivadas. Envía /subscribe para activarlas.",
 		);
 	});
 

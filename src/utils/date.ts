@@ -1,4 +1,4 @@
-const LOCALE = "en-US";
+const LOCALE = "es-ES";
 
 export const formatWallClock = (
 	instant: Temporal.Instant,
@@ -9,9 +9,11 @@ export const formatWallClock = (
 	});
 };
 
-export const formatDay = (isoDate: string): string =>
-	Temporal.PlainDate.from(isoDate).toLocaleString(LOCALE, {
+export const formatDay = (isoDate: string): string => {
+	const day = Temporal.PlainDate.from(isoDate).toLocaleString(LOCALE, {
 		weekday: "short",
 		day: "numeric",
 		month: "short",
 	});
+	return day.charAt(0).toUpperCase() + day.slice(1);
+};

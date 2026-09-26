@@ -6,7 +6,12 @@ import type { SlotsModel } from "./model";
 export const slotKey = (slot: FreshaModel["slot"]) =>
 	`${slot.date}T${slot.time}`;
 
-const slotWord = (count: number) => (count === 1 ? "slot" : "slots");
+const SERVICE = "Corte de pelo";
+
+const slotWord = (count: number) => (count === 1 ? "cita" : "citas");
+
+const plural = (count: number, one: string, many: string) =>
+	count === 1 ? one : many;
 
 const formatDays = (
 	startTimes: string[],
@@ -38,7 +43,7 @@ const formatAlert = (
 		"\n\n",
 	),
 	buttons: startTimes.some((key) => live.has(key))
-		? [[{ label: "Book on Fresha", url: links.salon }]]
+		? [[{ label: "Reservar en Fresha", url: links.salon }]]
 		: [],
 });
 
@@ -47,7 +52,7 @@ export const formatNewSlotsMessage = (
 	links: SlotsModel["bookingLinks"],
 ): Message =>
 	formatAlert(
-		`🟢 ${startTimes.length} new ${slotWord(startTimes.length)}`,
+		`🟢 ${startTimes.length} ${plural(startTimes.length, "cita nueva", "citas nuevas")} de ${SERVICE}`,
 		startTimes,
 		new Set(startTimes),
 		links,
@@ -59,13 +64,13 @@ export const formatCurrentSlotsMessage = (
 ): Message =>
 	startTimes.length > 0
 		? formatAlert(
-				`🟢 ${startTimes.length} ${slotWord(startTimes.length)} available`,
+				`🟢 ${startTimes.length} ${plural(startTimes.length, "cita disponible", "citas disponibles")} de ${SERVICE}`,
 				startTimes,
 				new Set(startTimes),
 				links,
 			)
 		: {
-				text: "No slots available right now. I'll message you as soon as one opens up.",
+				text: `No hay citas de ${SERVICE} disponibles ahora mismo. Te escribo en cuanto se libere una.`,
 			};
 
 export const formatUpdatedMessage = (
@@ -76,8 +81,8 @@ export const formatUpdatedMessage = (
 	const remaining = startTimes.filter((key) => live.has(key)).length;
 	const header =
 		remaining > 0
-			? `🟡 ${remaining} of ${startTimes.length} ${slotWord(startTimes.length)} left`
-			: "⚪ No slots left from this alert";
+			? `🟡 ${plural(remaining, "Queda", "Quedan")} ${remaining} de ${startTimes.length} ${slotWord(startTimes.length)} de ${SERVICE}`
+			: "⚪ Ya no queda ninguna cita de esta alerta";
 
 	return formatAlert(header, startTimes, live, links);
 };

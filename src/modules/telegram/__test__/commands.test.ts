@@ -109,7 +109,7 @@ describe("telegram commands", () => {
 		await commands.get("subscribe")?.(ctx);
 
 		expect(repo.listSubscribers()).toEqual([10]);
-		expect(replies).toEqual(["Alerts on."]);
+		expect(replies).toEqual(["Alertas activadas."]);
 		expect(slotsSentTo).toEqual([10]);
 	});
 
@@ -122,7 +122,7 @@ describe("telegram commands", () => {
 
 		expect(repo.listSubscribers()).toEqual([]);
 		expect(replies).toEqual([
-			"Alerts off. Send /subscribe to turn them back on.",
+			"Alertas desactivadas. Envía /subscribe para volver a activarlas.",
 		]);
 	});
 
@@ -135,7 +135,7 @@ describe("telegram commands", () => {
 
 		expect(repo.listSubscribers()).toEqual([10]);
 		expect(replies).toEqual([
-			"Alerts were already on. Send /slots to see the slots.",
+			"Las alertas ya estaban activadas. Envía /slots para ver las citas.",
 		]);
 		expect(slotsSentTo).toEqual([]);
 	});
@@ -150,7 +150,7 @@ describe("telegram commands", () => {
 
 		expect(repo.listSubscribers()).toEqual([]);
 		expect(replies).toEqual([
-			"Alerts were already off. Send /subscribe to turn them on.",
+			"Las alertas ya estaban desactivadas. Envía /subscribe para activarlas.",
 		]);
 	});
 
@@ -161,7 +161,7 @@ describe("telegram commands", () => {
 		await commands.get("unsubscribe")?.(ctx);
 
 		expect(replies).toEqual([
-			"Alerts were already off. Send /subscribe to turn them on.",
+			"Las alertas ya estaban desactivadas. Envía /subscribe para activarlas.",
 		]);
 	});
 
