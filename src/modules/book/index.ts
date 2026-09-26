@@ -1,7 +1,7 @@
 import { html } from "@elysiajs/html";
 import { Elysia, t } from "elysia";
-import { openInFreshaPage } from "./page";
 import { type BookDeps, createBookService } from "./service";
+import { openInFreshaPage } from "./view";
 
 export { type BookOutcome, parseSlot } from "./model";
 export {
