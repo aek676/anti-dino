@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import { log } from "@/utils/logger";
 import type { ChatId } from "./model";
 
 export type CommandsDeps = {
@@ -41,5 +42,13 @@ export const registerCommands = (bot: Bot, deps: CommandsDeps) => {
 	bot.command("unsubscribe", (ctx) => {
 		deps.unsubscribe(ctx.chatId);
 		return ctx.reply("Alerts off. Send /subscribe to turn them back on.");
+	});
+
+	bot.on("my_chat_member", (ctx) => {
+		const { status } = ctx.myChatMember.new_chat_member;
+		if (status !== "kicked" && status !== "left") return;
+
+		deps.unsubscribe(ctx.chatId);
+		log.info({ chatId: ctx.chatId, status }, "Unsubscribed chat that left");
 	});
 };

@@ -125,4 +125,32 @@ describe("telegram commands", () => {
 			"Alerts off. Send /subscribe to turn them back on.",
 		]);
 	});
+
+	test("blocking the bot turns the alerts off", async () => {
+		const { updates } = setup();
+		repo.subscribe(10);
+
+		await updates.get("my_chat_member")?.(fakeCtx(10, "kicked").ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
+	});
+
+	test("removing the bot from a group turns the alerts off", async () => {
+		const { updates } = setup();
+		repo.subscribe(10);
+
+		await updates.get("my_chat_member")?.(fakeCtx(10, "left").ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
+	});
+
+	test("unblocking the bot leaves the alerts as they were", async () => {
+		const { updates } = setup();
+		repo.subscribe(10);
+		repo.unsubscribe(10);
+
+		await updates.get("my_chat_member")?.(fakeCtx(10, "member").ctx);
+
+		expect(repo.listSubscribers()).toEqual([]);
+	});
 });
