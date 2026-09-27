@@ -13,6 +13,8 @@ export const COMMANDS = [
 	{ command: "slots", description: "Ver las citas disponibles ahora mismo" },
 	{ command: "subscribe", description: "Activar las alertas" },
 	{ command: "unsubscribe", description: "Desactivar las alertas" },
+	{ command: "remind", description: "Avisarme de un día y hora concretos" },
+	{ command: "reminders", description: "Ver y quitar mis avisos" },
 ];
 
 const WELCOME = [

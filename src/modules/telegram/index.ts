@@ -26,10 +26,18 @@ export type TelegramConfig = {
 export type TelegramPluginDeps = {
 	bot: Bot;
 	config: TelegramConfig;
+	/** Features that add their own commands and buttons to the bot, like reminders. */
+	handlers?: ((bot: Bot) => void)[];
 } & CommandsDeps;
 
-export const telegram = ({ bot, config, ...commands }: TelegramPluginDeps) => {
+export const telegram = ({
+	bot,
+	config,
+	handlers = [],
+	...commands
+}: TelegramPluginDeps) => {
 	registerCommands(bot, commands);
+	for (const register of handlers) register(bot);
 
 	return new Elysia({ name: "telegram" })
 		.onStart(async () => {

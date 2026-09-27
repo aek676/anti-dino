@@ -4,7 +4,11 @@ import { ENV } from "varlock/env";
 import { book, slotUrl } from "@/modules/book";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
-import { createRemindersRepository } from "@/modules/reminders";
+import {
+	createRemindersRepository,
+	createRemindersService,
+	registerReminders,
+} from "@/modules/reminders";
 import {
 	createSlotsRepository,
 	createSlotsService,
@@ -16,7 +20,7 @@ import {
 	telegram,
 } from "@/modules/telegram";
 import { watchdog } from "@/modules/watchdog";
-import { closeDatabase, openDatabase } from "@/utils/db";
+import { closeDatabase, createTransaction, openDatabase } from "@/utils/db";
 import { log } from "@/utils/logger";
 
 const db = openDatabase(ENV.DATABASE_PATH);
@@ -48,6 +52,14 @@ const slotsService = createSlotsService({
 });
 
 const remindersRepository = createRemindersRepository(db);
+
+const remindersService = createRemindersService({
+	repo: remindersRepository,
+	subscribers: subscribersRepository,
+	sendMatching: slotsService.sendMatching,
+	transaction: createTransaction(db),
+	config: { timeZone: ENV.SALON_TIME_ZONE, daysAhead: ENV.DAYS_AHEAD },
+});
 
 const freshaService = createFreshaService(fetch, {
 	stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
@@ -104,6 +116,7 @@ const app = new Elysia()
 			subscribe: subscribersRepository.subscribe,
 			unsubscribe: subscribersRepository.unsubscribe,
 			sendSlots: slotsService.sendCurrent,
+			handlers: [(bot) => registerReminders(bot, remindersService)],
 		}),
 	)
 	.onStop(({ store }) => {
