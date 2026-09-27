@@ -1,6 +1,9 @@
 import type { ChatId, Message, MessageId } from "@/modules/telegram";
 import { formatWallClock } from "@/utils/date";
-import { formatCurrentSlotsMessage } from "./format";
+import {
+	formatCurrentSlotsMessage,
+	formatOpenForReminderMessage,
+} from "./format";
 import type { SlotsModel } from "./model";
 import type { SlotsRepository } from "./repository";
 
@@ -61,5 +64,21 @@ export const createSlotsService = (deps: SlotsDeps) => {
 		repo.insertAlerts(new Map([[chatId, messageId]]), target, startTimes);
 	};
 
-	return { listCurrent, sendCurrent };
+	const sendMatching = async (
+		chatId: ChatId,
+		isMatch: (startsAt: string) => boolean,
+	) => {
+		const startTimes = listCurrent().filter(isMatch);
+		if (startTimes.length === 0) return;
+
+		const messageId = await deps.send(
+			chatId,
+			formatOpenForReminderMessage(startTimes, links),
+		);
+		if (messageId === undefined) return;
+
+		repo.insertAlerts(new Map([[chatId, messageId]]), target, startTimes);
+	};
+
+	return { listCurrent, sendCurrent, sendMatching };
 };

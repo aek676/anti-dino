@@ -1,6 +1,8 @@
 export {
 	formatCurrentSlotsMessage,
 	formatNewSlotsMessage,
+	formatOpenForReminderMessage,
+	formatReminderSlotsMessage,
 	formatUpdatedMessage,
 	slotKey,
 } from "./format";

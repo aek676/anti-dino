@@ -13,10 +13,13 @@ const slotWord = (count: number) => (count === 1 ? "cita" : "citas");
 const plural = (count: number, one: string, many: string) =>
 	count === 1 ? one : many;
 
+const REMINDER_MARK = "🎯";
+
 const formatDays = (
 	startTimes: string[],
 	live: Set<string>,
 	links: SlotsModel["bookingLinks"],
+	marked: Set<string> = new Set(),
 ): string[] =>
 	Object.entries(
 		Object.groupBy(startTimes.toSorted(), (key) => key.slice(0, 10)),
@@ -24,10 +27,12 @@ const formatDays = (
 		[
 			`<b>${formatDay(date)}</b>`,
 			keys
-				.map((key) =>
-					live.has(key)
-						? `<a href="${links.slot(key)}">${key.slice(11)}</a>`
-						: `<s>${key.slice(11)}</s>`,
+				.map(
+					(key) =>
+						(marked.has(key) ? REMINDER_MARK : "") +
+						(live.has(key)
+							? `<a href="${links.slot(key)}">${key.slice(11)}</a>`
+							: `<s>${key.slice(11)}</s>`),
 				)
 				.join("  "),
 		].join("\n"),
@@ -38,10 +43,12 @@ const formatAlert = (
 	startTimes: string[],
 	live: Set<string>,
 	links: SlotsModel["bookingLinks"],
+	marked?: Set<string>,
 ): Message => ({
-	text: [`<b>${header}</b>`, ...formatDays(startTimes, live, links)].join(
-		"\n\n",
-	),
+	text: [
+		`<b>${header}</b>`,
+		...formatDays(startTimes, live, links, marked),
+	].join("\n\n"),
 	buttons: startTimes.some((key) => live.has(key))
 		? [[{ label: "Reservar en Fresha", url: links.salon }]]
 		: [],
@@ -86,3 +93,34 @@ export const formatUpdatedMessage = (
 
 	return formatAlert(header, startTimes, live, links);
 };
+
+export const formatReminderSlotsMessage = (
+	startTimes: string[],
+	matched: Set<string>,
+	links: SlotsModel["bookingLinks"],
+): Message => {
+	const count = startTimes.length;
+	const all = startTimes.every((key) => matched.has(key));
+	const header = all
+		? `${REMINDER_MARK} ${count} ${plural(count, "cita nueva", "citas nuevas")} para tus avisos`
+		: `${REMINDER_MARK} ${count} ${plural(count, "cita nueva", "citas nuevas")} de ${SERVICE}, ${matched.size} para tus avisos`;
+
+	return formatAlert(
+		header,
+		startTimes,
+		new Set(startTimes),
+		links,
+		all ? undefined : matched,
+	);
+};
+
+export const formatOpenForReminderMessage = (
+	startTimes: string[],
+	links: SlotsModel["bookingLinks"],
+): Message =>
+	formatAlert(
+		`${REMINDER_MARK} Ya ${plural(startTimes.length, "hay 1 cita disponible", `hay ${startTimes.length} citas disponibles`)} para ese aviso`,
+		startTimes,
+		new Set(startTimes),
+		links,
+	);
