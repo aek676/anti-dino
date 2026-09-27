@@ -1,11 +1,20 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { FreshaError, type FreshaModel } from "@/modules/fresha";
 import {
+	createRemindersRepository,
+	type RemindersRepository,
+} from "@/modules/reminders";
+import {
 	bookingLinks,
 	createSlotsRepository,
 	watchTarget,
 } from "@/modules/slots";
-import type { Message } from "@/modules/telegram";
+import {
+	type ChatId,
+	createSubscribersRepository,
+	type Message,
+	type SubscribersRepository,
+} from "@/modules/telegram";
 import { type Db, openDatabase } from "@/utils/db";
 import { createWatchdogService, retry, type WatchdogConfig } from "../service";
 
@@ -148,9 +157,25 @@ describe("check", () => {
 	let edited: { chatId: number; messageId: number; message: Message }[];
 	const chatId = 42;
 	const bookButton = [[{ label: "Reservar en Fresha", url: links.salon }]];
+	let recipients: ChatId[];
+	let sentTo: ChatId[];
+	let reminders: RemindersRepository;
+	let subscribers: SubscribersRepository;
 	const notify = (message: Message) => {
 		sent.push(message);
+		sentTo.push(chatId);
 		return Promise.resolve(new Map([[chatId, sent.length]]));
+	};
+	const notifyEach = (compose: (chatId: ChatId) => Message | undefined) => {
+		const delivery = new Map<ChatId, number>();
+		for (const recipient of recipients) {
+			const message = compose(recipient);
+			if (!message) continue;
+			sent.push(message);
+			sentTo.push(recipient);
+			delivery.set(recipient, sent.length);
+		}
+		return Promise.resolve(delivery);
 	};
 	let sentToAdmin: string[];
 	const notifyAdmin = (message: Message) => {
@@ -175,6 +200,8 @@ describe("check", () => {
 			repo: createSlotsRepository(db),
 			fresha,
 			notify,
+			notifyEach,
+			reminders,
 			notifyAdmin,
 			edit,
 			now,
@@ -209,6 +236,10 @@ describe("check", () => {
 
 	beforeEach(() => {
 		db = openDatabase(":memory:");
+		reminders = createRemindersRepository(db);
+		subscribers = createSubscribersRepository(db);
+		recipients = [chatId];
+		sentTo = [];
 		sent = [];
 		sentToAdmin = [];
 		edited = [];
@@ -586,7 +617,9 @@ describe("check", () => {
 			sleep,
 			edit,
 			notifyAdmin,
-			notify: () => Promise.reject(new Error("telegram down")),
+			notify,
+			notifyEach: () => Promise.reject(new Error("telegram down")),
+			reminders,
 		});
 
 		expect(broken.check()).rejects.toThrow("telegram down");
@@ -688,5 +721,92 @@ describe("check", () => {
 		});
 		expect(sent).toHaveLength(1);
 		expect(countSlots()).toBe(0);
+	});
+
+	describe("with reminders", () => {
+		const other = 7;
+		// slotA and slotB are on 2026-09-17 at 11:30 and 11:45, slotC on 2026-09-18 at 10:00.
+		const remindSlotA = (chat: number) =>
+			reminders.insert(chat, {
+				day: "2026-09-17",
+				from: "11:00",
+				to: "11:40",
+			});
+		const alertedTimes = (chat: number) =>
+			db
+				.query<{ starts_at: string }, [number]>(
+					"SELECT starts_at FROM alerts WHERE chat_id = ? ORDER BY starts_at",
+				)
+				.all(chat)
+				.map((row) => row.starts_at);
+
+		beforeEach(() => {
+			recipients = [chatId, other];
+		});
+
+		test("a chat with only reminders gets just the matching slots", async () => {
+			remindSlotA(chatId);
+			subscribers.setOnlyReminders(chatId, true);
+
+			await service(fake([slotA, slotB, slotC])).check();
+
+			expect(sentTo).toEqual([chatId, other]);
+			expect(sent[0]).toEqual({
+				text: [
+					"<b>🎯 1 cita nueva para tus avisos</b>",
+					`<b>Jue, 17 sept</b>\n${link("2026-09-17T11:30")}`,
+				].join("\n\n"),
+				buttons: bookButton,
+			});
+			expect(alertedTimes(chatId)).toEqual(["2026-09-17T11:30"]);
+			expect(alertedTimes(other)).toHaveLength(3);
+		});
+
+		test("a chat with only reminders hears nothing when no slot matches", async () => {
+			remindSlotA(chatId);
+			subscribers.setOnlyReminders(chatId, true);
+
+			await service(fake([slotB, slotC])).check();
+
+			expect(sentTo).toEqual([other]);
+			expect(alertedTimes(chatId)).toEqual([]);
+		});
+
+		test("a chat that wants every slot gets them all with the matches marked", async () => {
+			remindSlotA(chatId);
+			subscribers.setOnlyReminders(chatId, false);
+
+			await service(fake([slotA, slotB])).check();
+
+			expect(sent[0]?.text).toBe(
+				[
+					"<b>🎯 2 citas nuevas de Corte de pelo, 1 para tus avisos</b>",
+					`<b>Jue, 17 sept</b>\n🎯${link("2026-09-17T11:30")}  ${link("2026-09-17T11:45")}`,
+				].join("\n\n"),
+			);
+			expect(alertedTimes(chatId)).toHaveLength(2);
+		});
+
+		test("a chat that never chose a mode gets every slot", async () => {
+			remindSlotA(chatId);
+
+			await service(fake([slotB])).check();
+
+			expect(sent[0]?.text).toStartWith("<b>🟢 1 cita nueva");
+		});
+
+		test("once its reminders pass, a chat with only reminders gets every slot again", async () => {
+			reminders.insert(chatId, {
+				day: "2026-09-13",
+				from: "00:00",
+				to: "24:00",
+			});
+			subscribers.setOnlyReminders(chatId, true);
+
+			await service(fake([slotC])).check();
+
+			expect(sentTo).toEqual([chatId, other]);
+			expect(reminders.listAudience("2000-01-01").size).toBe(0);
+		});
 	});
 });

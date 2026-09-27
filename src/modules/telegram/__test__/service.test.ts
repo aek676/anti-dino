@@ -190,6 +190,42 @@ describe("telegram service", () => {
 			[{ text: "Book", url: "https://example.com/book" }],
 		]);
 	});
+	test("notifyEach sends each chat its own message and skips undefined", async () => {
+		const { bot, sent } = fakeBot();
+		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });
+		repo.subscribe(10);
+		repo.subscribe(20);
+
+		const delivery = await service.notifyEach((chatId) =>
+			chatId === 20 ? undefined : { text: `for ${chatId}` },
+		);
+
+		expect(sent.map((m) => [m.chatId, m.text]).toSorted()).toEqual([
+			[ADMIN, `for ${ADMIN}`],
+			[10, "for 10"],
+		]);
+		expect([...delivery.keys()].toSorted()).toEqual([ADMIN, 10]);
+	});
+
+	test("notifyEach does not throw when every chat was skipped", async () => {
+		const { bot } = fakeBot(new Set([ADMIN, 10]));
+		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });
+		repo.subscribe(10);
+
+		expect(await service.notifyEach(() => undefined)).toEqual(new Map());
+	});
+
+	test("notifyEach throws when no chat with a message could be reached", () => {
+		const { bot } = fakeBot(new Set([ADMIN, 10]));
+		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });
+		repo.subscribe(10);
+		repo.subscribe(20);
+
+		expect(
+			service.notifyEach((chatId) => (chatId === 20 ? undefined : hello)),
+		).rejects.toThrow(/Delivered: 0, Total: 2/);
+	});
+
 	test("notifyAdmin writes to the admin only", async () => {
 		const { bot, sent } = fakeBot();
 		const service = createTelegramService({ repo, bot, adminChatId: ADMIN });

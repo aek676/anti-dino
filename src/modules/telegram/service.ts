@@ -78,25 +78,39 @@ export const createTelegramService = (deps: TelegramDeps) => {
 		}
 	};
 
-	const notify = async (message: Message): Promise<Delivery> => {
+	/**
+	 * Sends each subscriber, and the admin, the message `compose` builds for it; `undefined`
+	 * skips that chat. Throws when no chat that had a message could be reached.
+	 */
+	const notifyEach = async (
+		compose: (chatId: ChatId) => Message | undefined,
+	): Promise<Delivery> => {
 		const users = new Set([...deps.repo.listSubscribers(), deps.adminChatId]);
-		const delivered = new Map();
+		const delivered: Delivery = new Map();
+		let attempted = 0;
 		for (const chatId of users) {
+			const message = compose(chatId);
+			if (!message) continue;
+
+			attempted++;
 			const messageId = await send(chatId, message);
 			if (messageId !== undefined) delivered.set(chatId, messageId);
 		}
 
-		if (users.size > 0 && delivered.size <= 0)
+		if (attempted > 0 && delivered.size <= 0)
 			throw new Error(
-				`Failed to send message to subscribers. Delivered: ${delivered.size}, Total: ${users.size}`,
+				`Failed to send message to subscribers. Delivered: ${delivered.size}, Total: ${attempted}`,
 			);
 
 		return delivered;
 	};
 
+	const notify = (message: Message): Promise<Delivery> =>
+		notifyEach(() => message);
+
 	const notifyAdmin = async (message: Message) => {
 		await send(deps.adminChatId, message);
 	};
 
-	return { send, notify, notifyAdmin, edit };
+	return { send, notify, notifyEach, notifyAdmin, edit };
 };

@@ -4,6 +4,7 @@ import { ENV } from "varlock/env";
 import { book, slotUrl } from "@/modules/book";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
+import { createRemindersRepository } from "@/modules/reminders";
 import {
 	createSlotsRepository,
 	createSlotsService,
@@ -46,6 +47,8 @@ const slotsService = createSlotsService({
 	config: slotsConfig,
 });
 
+const remindersRepository = createRemindersRepository(db);
+
 const freshaService = createFreshaService(fetch, {
 	stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
 });
@@ -64,6 +67,8 @@ const app = new Elysia()
 			repo: slotsRepository,
 			fresha: freshaService,
 			notify: telegramService.notify,
+			notifyEach: telegramService.notifyEach,
+			reminders: remindersRepository,
 			notifyAdmin: telegramService.notifyAdmin,
 			edit: telegramService.edit,
 			config: {

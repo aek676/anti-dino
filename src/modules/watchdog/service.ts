@@ -1,7 +1,13 @@
 import { FreshaError, type FreshaService } from "@/modules/fresha";
 import {
+	matchesAny,
+	type ReminderModel,
+	type RemindersRepository,
+} from "@/modules/reminders";
+import {
 	bookingLinks,
 	formatNewSlotsMessage,
+	formatReminderSlotsMessage,
 	formatUpdatedMessage,
 	type SlotsConfig,
 	type SlotsRepository,
@@ -30,6 +36,10 @@ export type WatchdogDeps = {
 	repo: SlotsRepository;
 	fresha: Pick<FreshaService, "listSlots" | "rateLimitedUntil">;
 	notify: (message: Message) => Promise<Delivery>;
+	notifyEach: (
+		compose: (chatId: ChatId) => Message | undefined,
+	) => Promise<Delivery>;
+	reminders: Pick<RemindersRepository, "listAudience" | "deleteBefore">;
 	notifyAdmin: (message: Message) => Promise<void>;
 	edit: (
 		chatId: ChatId,
@@ -67,6 +77,40 @@ export const retry = async <T>(
 	}
 
 	return lastError;
+};
+
+type Composed = { message: Message; startTimes: string[] };
+
+/**
+ * What one chat gets for the new slots. Without reminders, every slot. With reminders,
+ * either only the matching slots or every slot with the matching ones marked.
+ */
+export const composeForChat = (
+	newStartTimes: string[],
+	audience: ReminderModel["audience"] | undefined,
+	links: ReturnType<typeof bookingLinks>,
+): Composed | undefined => {
+	const everything = {
+		message: formatNewSlotsMessage(newStartTimes, links),
+		startTimes: newStartTimes,
+	};
+	if (!audience || audience.reminders.length === 0) return everything;
+
+	const matched = newStartTimes.filter((key) =>
+		matchesAny(audience.reminders, key),
+	);
+	if (audience.onlyReminders) {
+		if (matched.length === 0) return;
+		return {
+			message: formatReminderSlotsMessage(matched, new Set(matched), links),
+			startTimes: matched,
+		};
+	}
+	if (matched.length === 0) return everything;
+	return {
+		message: formatReminderSlotsMessage(newStartTimes, new Set(matched), links),
+		startTimes: newStartTimes,
+	};
 };
 
 export type CheckResult =
@@ -131,6 +175,7 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		const salonNow = formatWallClock(now, config.timeZone);
 
 		repo.deleteAlertsBefore(salonNow);
+		deps.reminders.deleteBefore(salonNow.slice(0, 10));
 
 		const pausedUntil = deps.fresha.rateLimitedUntil();
 		if (pausedUntil) {
@@ -185,11 +230,22 @@ export const createWatchdogService = (deps: WatchdogDeps) => {
 		}
 
 		if (newSlots.length > 0) {
-			const delivery = await deps.notify(
-				formatNewSlotsMessage(newStartTimes, links),
-			);
+			const audience = deps.reminders.listAudience(salonNow.slice(0, 10));
+			const composed = new Map<ChatId, Composed>();
+			const delivery = await deps.notifyEach((chatId) => {
+				const forChat = composeForChat(
+					newStartTimes,
+					audience.get(chatId),
+					links,
+				);
+				if (forChat) composed.set(chatId, forChat);
+				return forChat?.message;
+			});
 
-			repo.insertAlerts(delivery, target, newStartTimes);
+			for (const [chatId, messageId] of delivery) {
+				const startTimes = composed.get(chatId)?.startTimes ?? [];
+				repo.insertAlerts(new Map([[chatId, messageId]]), target, startTimes);
+			}
 		}
 
 		repo.insertSlots(target, newStartTimes, seenAt);
