@@ -30,6 +30,20 @@ export const createSubscribersRepository = (db: Db) => {
 		`SELECT chat_id FROM subscribers WHERE notify = 1`,
 	);
 
+	const selectOnlyReminders = db.query<
+		{ only_reminders: number | null },
+		{ chatId: number }
+	>("SELECT only_reminders FROM subscribers WHERE chat_id = :chatId");
+
+	const upsertOnlyReminders = db.query<
+		void,
+		{ chatId: number; only: number; now: string }
+	>(
+		`INSERT INTO subscribers (chat_id, created_at, notify, only_reminders)
+		VALUES (:chatId, :now, 1, :only)
+		ON CONFLICT (chat_id) DO UPDATE SET only_reminders = :only, updated_at = :now`,
+	);
+
 	const register = (chatId: ChatId) => {
 		insertSubscriber.run({ chatId, now: now() });
 	};
@@ -43,5 +57,25 @@ export const createSubscribersRepository = (db: Db) => {
 	const listSubscribers = (): ChatId[] =>
 		selectSubscribers.all().map((row) => row.chat_id);
 
-	return { register, subscribe, unsubscribe, listSubscribers };
+	const getOnlyReminders = (chatId: ChatId): boolean | null => {
+		const value = selectOnlyReminders.get({ chatId })?.only_reminders;
+		return value === undefined || value === null ? null : value === 1;
+	};
+
+	const setOnlyReminders = (chatId: ChatId, onlyReminders: boolean) => {
+		upsertOnlyReminders.run({
+			chatId,
+			only: onlyReminders ? 1 : 0,
+			now: now(),
+		});
+	};
+
+	return {
+		register,
+		subscribe,
+		unsubscribe,
+		listSubscribers,
+		getOnlyReminders,
+		setOnlyReminders,
+	};
 };
