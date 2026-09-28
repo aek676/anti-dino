@@ -1,6 +1,6 @@
 import type { Bot } from "grammy";
 import { log } from "@/utils/logger";
-import type { ChatId } from "./model";
+import type { BotContext, ChatId } from "./model";
 
 export type CommandsDeps = {
 	register: (chatId: ChatId) => void;
@@ -28,7 +28,7 @@ const WELCOME = [
 	"Las alertas están activadas. Estas son las citas disponibles ahora mismo:",
 ].join("\n\n");
 
-export const registerCommands = (bot: Bot, deps: CommandsDeps) => {
+export const registerCommands = (bot: Bot<BotContext>, deps: CommandsDeps) => {
 	bot.command("start", async (ctx) => {
 		deps.register(ctx.chatId);
 		await ctx.reply(WELCOME, { parse_mode: "HTML" });

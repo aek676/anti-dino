@@ -1,16 +1,13 @@
 import { InlineKeyboard } from "grammy";
 import { formatDay } from "@/utils/date";
-import { encode } from "./callback";
-import { MAX_REMINDERS, type ReminderModel } from "./model";
-
-const FIRST_HOUR = 9;
-const LAST_HOUR = 21;
-
-const NAMED_RANGES = [
-	{ label: "Mañana (9–14)", from: "09:00", to: "14:00" },
-	{ label: "Tarde (14–21)", from: "14:00", to: "21:00" },
-	{ label: "Todo el día", from: "00:00", to: "24:00" },
-] as const;
+import { encodeList, flow } from "./callback";
+import {
+	FIRST_HOUR,
+	LAST_HOUR,
+	MAX_REMINDERS,
+	NAMED_RANGES,
+	type ReminderModel,
+} from "./model";
 
 const hourTime = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
@@ -70,36 +67,24 @@ export const dayPicker = (
 	const keyboard = new InlineKeyboard();
 	for (let offset = first; offset < last; offset++) {
 		const day = start.add({ days: offset });
-		keyboard.text(
-			dayLabel(day, offset),
-			encode({ kind: "day", day: day.toString() }),
-		);
+		keyboard.text(dayLabel(day, offset), flow.day(day.toString()));
 		if ((offset - first + 1) % DAYS_PER_ROW === 0) keyboard.row();
 	}
 	keyboard.row();
 
-	if (page > 0) keyboard.text("◀", encode({ kind: "page", page: page - 1 }));
-	if (page < pageCount(daysAhead) - 1)
-		keyboard.text("▶", encode({ kind: "page", page: page + 1 }));
-	keyboard.row().text("Cancelar", encode({ kind: "cancel" }));
+	if (page > 0) keyboard.text("◀", flow.page(page - 1));
+	if (page < pageCount(daysAhead) - 1) keyboard.text("▶", flow.page(page + 1));
+	keyboard.row().text("Cancelar", flow.cancel);
 
 	const question = "¿Qué día quieres la cita?";
 	return { text: notice ? `${notice}\n\n${question}` : question, keyboard };
 };
 
-export const rangePicker = (day: string, page: number): View => {
+export const rangePicker = (day: string): View => {
 	const keyboard = new InlineKeyboard();
 	for (const range of NAMED_RANGES)
-		keyboard
-			.text(
-				range.label,
-				encode({ kind: "save", day, from: range.from, to: range.to }),
-			)
-			.row();
-	keyboard
-		.text("Otra hora", encode({ kind: "from", day }))
-		.row()
-		.text("◀ Cambiar día", encode({ kind: "page", page }));
+		keyboard.text(range.label, flow.range(range.from, range.to)).row();
+	keyboard.text("Otra hora", flow.other).row().text("◀ Cambiar día", flow.back);
 
 	return { text: `${formatDay(day)}: ¿a qué hora?`, keyboard };
 };
@@ -124,8 +109,8 @@ export const fromPicker = (day: string): View => ({
 	text: `${formatDay(day)}: ¿desde qué hora?`,
 	keyboard: hourGrid(
 		range(FIRST_HOUR, LAST_HOUR - 1),
-		(hour) => encode({ kind: "to", day, from: hourTime(hour) }),
-		encode({ kind: "day", day }),
+		(hour) => flow.from(hourTime(hour)),
+		flow.back,
 	),
 });
 
@@ -136,8 +121,8 @@ export const toPicker = (day: string, from: string): View => {
 		text: `${formatDay(day)} desde las ${from}: ¿hasta qué hora?`,
 		keyboard: hourGrid(
 			range(firstHour, LAST_HOUR),
-			(hour) => encode({ kind: "save", day, from, to: hourTime(hour) }),
-			encode({ kind: "from", day }),
+			(hour) => flow.to(hourTime(hour)),
+			flow.back,
 		),
 	};
 };
@@ -148,12 +133,12 @@ const modeKeyboard = (source: "confirm" | "list") =>
 	new InlineKeyboard()
 		.text(
 			"🎯 Solo mis avisos",
-			encode({ kind: "mode", onlyReminders: true, source }),
+			encodeList({ kind: "mode", onlyReminders: true, source }),
 		)
 		.row()
 		.text(
 			"🔔 Todas las citas",
-			encode({ kind: "mode", onlyReminders: false, source }),
+			encodeList({ kind: "mode", onlyReminders: false, source }),
 		);
 
 export const saved = (
@@ -206,12 +191,12 @@ export const list = (
 		keyboard
 			.text(
 				`❌ ${shortDescribe(reminder)}`,
-				encode({ kind: "remove", id: reminder.id }),
+				encodeList({ kind: "remove", id: reminder.id }),
 			)
 			.row();
 	keyboard.text(
 		onlyReminders ? "🔔 Recibir todas las citas" : "🎯 Recibir solo mis avisos",
-		encode({ kind: "mode", onlyReminders: !onlyReminders, source: "list" }),
+		encodeList({ kind: "mode", onlyReminders: !onlyReminders, source: "list" }),
 	);
 
 	return {

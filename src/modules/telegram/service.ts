@@ -1,12 +1,12 @@
 import { type Bot, GrammyError, InlineKeyboard } from "grammy";
 import { log } from "@/utils/logger";
-import type { ChatId, Delivery, Message, MessageId } from "./model";
+import type { BotContext, ChatId, Delivery, Message, MessageId } from "./model";
 import type { SubscribersRepository } from "./repository";
 
 export type TelegramDeps = {
 	repo: Pick<SubscribersRepository, "listSubscribers" | "unsubscribe">;
 	adminChatId: number;
-	bot: Bot;
+	bot: Bot<BotContext>;
 };
 
 // Telegram sends 400 when the message or chat is gone and 403 when the bot is blocked.

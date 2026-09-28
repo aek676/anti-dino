@@ -1,54 +1,77 @@
-import { type Bot, type Context, GrammyError } from "grammy";
+import { createConversation } from "@grammyjs/conversations";
+import type { Bot } from "grammy";
+import type { BotContext } from "@/modules/telegram";
 import { log } from "@/utils/logger";
-import { CALLBACK_PATTERN } from "./callback";
-import type { RemindersService, Reply } from "./service";
-import type { View } from "./views";
+import { LIST_PATTERN, parseList } from "./callback";
+import {
+	BROKEN_BUTTON,
+	createRemindConversation,
+	FAILED,
+	REMIND,
+	REMIND_TIMEOUT_MS,
+} from "./conversation";
+import { reply, show } from "./render";
+import type { RemindersService } from "./service";
+import * as views from "./views";
 
-const FAILED = "Algo ha fallado, inténtalo de nuevo.";
+export const registerReminders = (
+	bot: Bot<BotContext>,
+	service: RemindersService,
+) => {
+	bot.use(
+		createConversation(createRemindConversation(service), {
+			id: REMIND,
+			maxMillisecondsToWait: REMIND_TIMEOUT_MS,
+		}),
+	);
 
-const reply = (ctx: Context, view: View) =>
-	ctx.reply(view.text, { reply_markup: view.keyboard });
-
-const show = async (ctx: Context, view: View) => {
-	try {
-		await ctx.editMessageText(view.text, { reply_markup: view.keyboard });
-	} catch (error) {
-		if (
-			error instanceof GrammyError &&
-			error.description.includes("message is not modified")
-		)
-			return;
-		throw error;
-	}
-};
-
-export const registerReminders = (bot: Bot, service: RemindersService) => {
-	bot.command("remind", (ctx) => reply(ctx, service.start()));
+	// A second /remind drops the picker that was open and starts over.
+	bot.command("remind", async (ctx) => {
+		await ctx.conversation.exit(REMIND);
+		await ctx.conversation.enter(REMIND, ctx.chatId);
+	});
 
 	bot.command("reminders", (ctx) => reply(ctx, service.list(ctx.chatId)));
 
-	bot.callbackQuery(CALLBACK_PATTERN, async (ctx) => {
+	bot.callbackQuery(LIST_PATTERN, async (ctx) => {
 		const { chatId } = ctx;
-		const { data, message } = ctx.callbackQuery;
-		let result: Reply;
+		const callback = parseList(ctx.callbackQuery.data);
+		if (!callback || chatId === undefined)
+			return ctx.answerCallbackQuery({ text: BROKEN_BUTTON });
 
 		try {
-			result =
-				chatId === undefined
-					? { answer: service.brokenButton }
-					: await service.press(chatId, data, message?.text ?? "");
-			if (result.view) await show(ctx, result.view);
-		} catch (error) {
-			log.warn({ chatId, data, err: error }, "reminder callback failed");
-			result = { answer: FAILED };
-		}
+			if (callback.kind === "remove") {
+				const removed = service.remove(chatId, callback.id);
+				await show(ctx, service.list(chatId));
+				await ctx.answerCallbackQuery(
+					removed ? { text: "Aviso quitado" } : undefined,
+				);
+				return;
+			}
 
-		try {
-			await ctx.answerCallbackQuery(
-				result.answer ? { text: result.answer } : undefined,
+			service.setMode(chatId, callback.onlyReminders);
+			await show(
+				ctx,
+				callback.source === "list"
+					? service.list(chatId)
+					: views.modeChosen(
+							ctx.callbackQuery.message?.text ?? "",
+							callback.onlyReminders,
+						),
 			);
+			await ctx.answerCallbackQuery();
 		} catch (error) {
-			log.warn({ chatId, err: error }, "Failed to answer reminder callback");
+			log.warn(
+				{ chatId, data: ctx.callbackQuery.data, err: error },
+				"reminder callback failed",
+			);
+			await ctx.answerCallbackQuery({ text: FAILED });
 		}
 	});
+
+	// Whatever the conversation did not take: buttons from before this code, or from a
+	// picker that expired or was replaced by a newer /remind.
+	bot.on("callback_query:data", (ctx) =>
+		ctx.answerCallbackQuery({ text: BROKEN_BUTTON }),
+	);
 };

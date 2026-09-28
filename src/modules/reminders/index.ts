@@ -11,5 +11,5 @@ export {
 	type RemindersConfig,
 	type RemindersDeps,
 	type RemindersService,
-	type Reply,
+	type SaveResult,
 } from "./service";

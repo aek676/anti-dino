@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { type Db, openDatabase } from "@/utils/db";
 import {
+	createConversationsRepository,
 	createSubscribersRepository,
 	type SubscribersRepository,
 } from "../repository";
@@ -41,5 +42,40 @@ describe("subscribers repository", () => {
 
 		expect(repo.getOnlyReminders(10)).toBe(false);
 		expect(repo.listSubscribers()).toEqual([10]);
+	});
+});
+
+type State = { remind: { step: string; day?: string }[] };
+const VERSION: [0, number] = [0, 1];
+
+describe("conversations repository", () => {
+	let db: Db;
+
+	beforeEach(() => {
+		db = openDatabase(":memory:");
+	});
+	afterEach(() => {
+		db.close();
+	});
+
+	test("stores, overwrites and deletes a chat's state", async () => {
+		const storage = createConversationsRepository<State>(db);
+		const state = { version: VERSION, state: { remind: [{ step: "day" }] } };
+
+		expect(await storage.read("10")).toBeUndefined();
+
+		await storage.write("10", state);
+		expect(await storage.read("10")).toEqual(state);
+
+		const next = {
+			version: VERSION,
+			state: { remind: [{ step: "range", day: "2026-10-02" }] },
+		};
+		await storage.write("10", next);
+		expect(await storage.read("10")).toEqual(next);
+		expect(await storage.read("11")).toBeUndefined();
+
+		await storage.delete("10");
+		expect(await storage.read("10")).toBeUndefined();
 	});
 });

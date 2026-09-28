@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { Bot, Context, InlineKeyboard } from "grammy";
 import {
 	createSubscribersRepository,
 	type SubscribersRepository,
 } from "@/modules/telegram";
 import { createTransaction, type Db, openDatabase } from "@/utils/db";
-import { type Callback, encode } from "../callback";
 import { registerReminders } from "../handlers";
 import { MAX_REMINDERS } from "../model";
 import {
@@ -13,99 +11,54 @@ import {
 	type RemindersRepository,
 } from "../repository";
 import { createRemindersService } from "../service";
+import { buttons, CHAT, createTestBot } from "./harness";
 
-type Handler = (ctx: Context) => unknown;
-type Shown = { text: string; keyboard?: InlineKeyboard };
-
-const CHAT = 10;
-
-const fakeBot = () => {
-	const commands = new Map<string, Handler>();
-	let callbacks: Handler | undefined;
-	const bot = {
-		command: (name: string, handler: Handler) => {
-			commands.set(name, handler);
-		},
-		callbackQuery: (_trigger: RegExp, handler: Handler) => {
-			callbacks = handler;
-		},
-	} as unknown as Bot;
-	return {
-		bot,
-		command: (name: string, ctx: Context) => commands.get(name)?.(ctx),
-		tap: (ctx: Context) => callbacks?.(ctx),
-	};
-};
-
-const fakeCtx = (data?: string, messageText = "") => {
-	const replies: Shown[] = [];
-	const edits: Shown[] = [];
-	const answers: (string | undefined)[] = [];
-	const ctx = {
-		chatId: CHAT,
-		callbackQuery: data ? { data, message: { text: messageText } } : undefined,
-		reply: (text: string, options?: { reply_markup?: InlineKeyboard }) => {
-			replies.push({ text, keyboard: options?.reply_markup });
-			return Promise.resolve();
-		},
-		editMessageText: (
-			text: string,
-			options?: { reply_markup?: InlineKeyboard },
-		) => {
-			edits.push({ text, keyboard: options?.reply_markup });
-			return Promise.resolve();
-		},
-		answerCallbackQuery: (options?: { text?: string }) => {
-			answers.push(options?.text);
-			return Promise.resolve();
-		},
-	} as unknown as Context;
-	return { ctx, replies, edits, answers };
-};
+const BROKEN = "Este botón ya no funciona. Usa /remind.";
+const DAY_GONE = "Ese día ya no está disponible.";
 
 describe("reminder handlers", () => {
 	let db: Db;
 	let repo: RemindersRepository;
 	let subscribers: SubscribersRepository;
 	let matching: { chatId: number; hits: string[] }[];
+	let now: string;
+	let sendMatchingFails: boolean;
 	const openSlots = [
 		"2026-10-02T12:00",
 		"2026-10-02T17:30",
 		"2026-10-03T17:30",
 	];
 
-	const setup = () => {
-		const fake = fakeBot();
-		registerReminders(
-			fake.bot,
-			createRemindersService({
-				repo,
-				subscribers,
-				sendMatching: (chatId, isMatch) => {
-					matching.push({ chatId, hits: openSlots.filter(isMatch) });
-					return Promise.resolve();
-				},
-				transaction: createTransaction(db),
-				config: { timeZone: "Europe/Madrid", daysAhead: 31 },
-				now: () => Temporal.Instant.from("2026-09-26T10:00:00Z"),
-			}),
+	const setup = () =>
+		createTestBot(db, (bot) =>
+			registerReminders(
+				bot,
+				createRemindersService({
+					repo,
+					subscribers,
+					sendMatching: (chatId, isMatch) => {
+						if (sendMatchingFails) return Promise.reject(new Error("boom"));
+						matching.push({ chatId, hits: openSlots.filter(isMatch) });
+						return Promise.resolve();
+					},
+					transaction: createTransaction(db),
+					config: { timeZone: "Europe/Madrid", daysAhead: 31 },
+					now: () => Temporal.Instant.from(now),
+				}),
+			),
 		);
-		return {
-			...fake,
-			press: async (callback: Callback | string, messageText?: string) => {
-				const data = typeof callback === "string" ? callback : encode(callback);
-				const context = fakeCtx(data, messageText);
-				await fake.tap(context.ctx);
-				return context;
-			},
-		};
-	};
+
+	const conversationRows = () =>
+		db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM conversations").get()
+			?.n;
 
 	beforeEach(() => {
 		db = openDatabase(":memory:");
 		repo = createRemindersRepository(db);
 		subscribers = createSubscribersRepository(db);
 		matching = [];
+		now = "2026-09-26T10:00:00Z";
+		sendMatchingFails = false;
 	});
 	afterEach(() => {
 		db.close();
@@ -113,60 +66,113 @@ describe("reminder handlers", () => {
 
 	test("/remind starts with the day picker", async () => {
 		const { command } = setup();
-		const { ctx, replies } = fakeCtx();
 
-		await command("remind", ctx);
+		const { sent } = await command("/remind");
 
-		expect(replies[0]?.text).toBe("¿Qué día quieres la cita?");
-		expect(replies[0]?.keyboard?.inline_keyboard[0]?.[0]?.text).toBe("Hoy");
+		expect(sent[0]?.text).toBe("¿Qué día quieres la cita?");
+		expect(buttons(sent[0]?.keyboard)[0]?.[0]).toEqual({
+			text: "Hoy",
+			data: "day:2026-09-26",
+		});
+		expect(conversationRows()).toBe(1);
 	});
 
 	test("another hour walks through start and end and saves the reminder", async () => {
-		const { press } = setup();
-		const day = "2026-10-02";
+		const { command, tap } = setup();
+		await command("/remind");
 
-		expect((await press({ kind: "day", day })).edits[0]?.text).toBe(
+		expect((await tap("day:2026-10-02")).edits[0]?.text).toBe(
 			"Vie, 2 oct: ¿a qué hora?",
 		);
-		expect((await press({ kind: "from", day })).edits[0]?.text).toBe(
+		expect((await tap("other")).edits[0]?.text).toBe(
 			"Vie, 2 oct: ¿desde qué hora?",
 		);
-		expect(
-			(await press({ kind: "to", day, from: "17:00" })).edits[0]?.text,
-		).toBe("Vie, 2 oct desde las 17:00: ¿hasta qué hora?");
+		expect((await tap("from:17:00")).edits[0]?.text).toBe(
+			"Vie, 2 oct desde las 17:00: ¿hasta qué hora?",
+		);
 
-		const saved = await press({
-			kind: "save",
-			day,
-			from: "17:00",
-			to: "19:00",
-		});
+		const saved = await tap("to:19:00");
 
 		expect(saved.edits[0]?.text).toStartWith(
 			"✅ Te aviso si sale cita el Vie, 2 oct de 17:00 a 19:00.",
 		);
 		expect(saved.answers).toEqual([undefined]);
 		expect(repo.listByChat(CHAT, "2026-09-26")).toEqual([
-			{ id: expect.any(Number), chatId: CHAT, day, from: "17:00", to: "19:00" },
+			{
+				id: expect.any(Number),
+				chatId: CHAT,
+				day: "2026-10-02",
+				from: "17:00",
+				to: "19:00",
+			},
 		]);
+		expect(matching).toEqual([{ chatId: CHAT, hits: ["2026-10-02T17:30"] }]);
+		expect(conversationRows()).toBe(0);
+	});
+
+	test("a named range saves right away", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
+		await tap("day:2026-10-02");
+
+		const saved = await tap("range:14:00-21:00");
+
+		expect(saved.edits[0]?.text).toStartWith(
+			"✅ Te aviso si sale cita el Vie, 2 oct de 14:00 a 21:00.",
+		);
 		expect(matching).toEqual([{ chatId: CHAT, hits: ["2026-10-02T17:30"] }]);
 	});
 
-	test("asks for the delivery mode only until the chat picks one", async () => {
-		const { press } = setup();
+	test("the pages move forward and back; a page that was not offered is refused", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
 
-		const first = await press({
-			kind: "save",
-			day: "2026-10-02",
-			from: "09:00",
-			to: "14:00",
-		});
-		expect(first.edits[0]?.text).toContain("¿Qué quieres recibir");
+		const next = await tap("page:1");
+		expect(buttons(next.edits[0]?.keyboard)[0]?.[0]?.text).toBe("Sáb 3");
 
-		const chosen = await press(
-			{ kind: "mode", onlyReminders: true, source: "confirm" },
-			first.edits[0]?.text,
+		expect((await tap("page:99")).answers).toEqual([BROKEN]);
+
+		const back = await tap("page:0");
+		expect(buttons(back.edits[0]?.keyboard)[0]?.[0]?.text).toBe("Hoy");
+	});
+
+	test("back goes to the previous step, with the day picker on the day's page", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
+		await tap("page:1");
+		await tap("day:2026-10-05");
+		await tap("other");
+		await tap("from:16:00");
+
+		expect((await tap("back")).edits[0]?.text).toBe(
+			"Lun, 5 oct: ¿desde qué hora?",
 		);
+		expect((await tap("back")).edits[0]?.text).toBe("Lun, 5 oct: ¿a qué hora?");
+
+		const days = await tap("back");
+		expect(days.edits[0]?.text).toBe("¿Qué día quieres la cita?");
+		expect(buttons(days.edits[0]?.keyboard)[0]?.[0]?.text).toBe("Sáb 3");
+	});
+
+	test("cancel closes the picker and ends the flow", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
+
+		expect((await tap("cancel")).edits[0]?.text).toBe("Cancelado.");
+		expect(conversationRows()).toBe(0);
+		expect((await tap("day:2026-10-02")).answers).toEqual([BROKEN]);
+	});
+
+	test("asks for the delivery mode only until the chat picks one", async () => {
+		const { command, tap, lastMessageId } = setup();
+		await command("/remind");
+		await tap("day:2026-10-02");
+
+		const first = await tap("range:09:00-14:00");
+		const text = first.edits[0]?.text ?? "";
+		expect(text).toContain("¿Qué quieres recibir");
+
+		const chosen = await tap("rem:mode:only:confirm", lastMessageId(), text);
 		expect(chosen.edits[0]?.text).toBe(
 			[
 				"✅ Te aviso si sale cita el Vie, 2 oct de 09:00 a 14:00.",
@@ -175,33 +181,28 @@ describe("reminder handlers", () => {
 		);
 		expect(subscribers.getOnlyReminders(CHAT)).toBe(true);
 
-		const second = await press({
-			kind: "save",
-			day: "2026-10-03",
-			from: "09:00",
-			to: "14:00",
-		});
+		await command("/remind");
+		await tap("day:2026-10-01");
+		const second = await tap("range:09:00-14:00");
 		expect(second.edits[0]?.text).not.toContain("¿Qué quieres recibir");
 	});
 
 	test("a duplicate is not saved twice nor resent", async () => {
-		const { press } = setup();
-		const save: Callback = {
-			kind: "save",
-			day: "2026-10-02",
-			from: "14:00",
-			to: "21:00",
-		};
+		const { command, tap } = setup();
+		await command("/remind");
+		await tap("day:2026-10-02");
+		await tap("range:14:00-21:00");
 
-		await press(save);
-		const again = await press(save);
+		await command("/remind");
+		await tap("day:2026-10-02");
+		const again = await tap("range:14:00-21:00");
 
 		expect(again.edits[0]?.text).toStartWith("Ya tenías ese aviso");
 		expect(matching).toHaveLength(1);
 	});
 
 	test("refuses more than the limit but ignores past reminders", async () => {
-		const { press } = setup();
+		const { command, tap } = setup();
 		repo.insert(CHAT, { day: "2026-09-20", from: "09:00", to: "10:00" });
 		for (let hour = 10; hour < 10 + MAX_REMINDERS; hour++)
 			repo.insert(CHAT, {
@@ -209,13 +210,10 @@ describe("reminder handlers", () => {
 				from: `${hour}:00`,
 				to: `${hour}:30`,
 			});
+		await command("/remind");
+		await tap("day:2026-10-01");
 
-		const refused = await press({
-			kind: "save",
-			day: "2026-10-03",
-			from: "09:00",
-			to: "14:00",
-		});
+		const refused = await tap("range:09:00-14:00");
 
 		expect(refused.edits[0]?.text).toStartWith(
 			`Ya tienes ${MAX_REMINDERS} avisos.`,
@@ -224,74 +222,124 @@ describe("reminder handlers", () => {
 		expect(matching).toEqual([]);
 	});
 
-	test("a button for a day that passed goes back to the day picker", async () => {
-		const { press } = setup();
+	test("a day that passes while the picker is open goes back to the day picker", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
+		await tap("day:2026-09-27");
+		now = "2026-09-28T10:00:00Z";
 
-		const tapped = await press({
-			kind: "save",
-			day: "2026-09-25",
-			from: "14:00",
-			to: "21:00",
-		});
+		const tapped = await tap("range:14:00-21:00");
 
-		expect(tapped.answers).toEqual(["Ese día ya no está disponible"]);
-		expect(tapped.edits[0]?.text).toStartWith("Ese día ya no está disponible.");
+		expect(tapped.answers).toEqual([DAY_GONE]);
+		expect(tapped.edits[0]?.text).toStartWith(DAY_GONE);
 		expect(repo.listByChat(CHAT, "2000-01-01")).toEqual([]);
+
+		expect((await tap("day:2026-09-28")).edits[0]?.text).toBe(
+			"Lun, 28 sept: ¿a qué hora?",
+		);
 	});
 
-	test("a day beyond what Fresha is checked is refused", async () => {
-		const { press } = setup();
+	test("a day that passed since the picker was drawn is refused", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
+		now = "2026-09-27T10:00:00Z";
 
-		const tapped = await press({ kind: "day", day: "2026-10-27" });
+		const tapped = await tap("day:2026-09-26");
 
-		expect(tapped.answers).toEqual(["Ese día ya no está disponible"]);
+		expect(tapped.answers).toEqual([DAY_GONE]);
+		expect(tapped.edits[0]?.text).toStartWith(DAY_GONE);
 	});
 
-	test("a malformed button is answered without editing", async () => {
-		const { press } = setup();
+	test("buttons from another step or from before are answered without editing", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
 
-		const tapped = await press("r:s:nonsense");
-
-		expect(tapped.edits).toEqual([]);
-		expect(tapped.answers).toEqual(["Este botón ya no funciona. Usa /remind."]);
+		expect(await tap("range:09:00-14:00")).toEqual({
+			sent: [],
+			edits: [],
+			answers: [BROKEN],
+		});
+		expect((await tap("r:s:2026-10-02:1400:2100")).answers).toEqual([BROKEN]);
+		expect((await tap("day:2026-10-02")).edits[0]?.text).toBe(
+			"Vie, 2 oct: ¿a qué hora?",
+		);
 	});
 
-	test("/reminders lists them and a tap removes one", async () => {
-		const { command, press } = setup();
+	test("a second /remind replaces the open picker", async () => {
+		const { command, tap, lastMessageId } = setup();
+		await command("/remind");
+		const old = lastMessageId();
+		await tap("day:2026-10-02");
+
+		await command("/remind");
+		expect(conversationRows()).toBe(1);
+
+		expect((await tap("range:09:00-14:00", old)).answers).toEqual([BROKEN]);
+		expect((await tap("day:2026-10-01")).edits[0]?.text).toBe(
+			"Jue, 1 oct: ¿a qué hora?",
+		);
+	});
+
+	test("/reminders and its buttons keep working while a picker is open", async () => {
+		const { command, tap, lastMessageId } = setup();
 		const reminder = repo.insert(CHAT, {
 			day: "2026-10-02",
 			from: "14:00",
 			to: "21:00",
 		});
-		const { ctx, replies } = fakeCtx();
+		await command("/remind");
+		const picker = lastMessageId();
 
-		await command("reminders", ctx);
-		expect(replies[0]?.text).toContain("• Vie, 2 oct de 14:00 a 21:00");
+		const listed = await command("/reminders");
+		expect(listed.sent[0]?.text).toContain("• Vie, 2 oct de 14:00 a 21:00");
 
-		const removed = await press({ kind: "remove", id: reminder.id });
-
+		const removed = await tap(`rem:remove:${reminder.id}`);
 		expect(removed.answers).toEqual(["Aviso quitado"]);
 		expect(removed.edits[0]?.text).toStartWith("No tienes avisos");
 		expect(repo.listByChat(CHAT, "2026-09-26")).toEqual([]);
+
+		expect((await tap("day:2026-10-02", picker)).edits[0]?.text).toBe(
+			"Vie, 2 oct: ¿a qué hora?",
+		);
 	});
 
 	test("the mode switch in the list flips the mode and redraws it", async () => {
-		const { press } = setup();
+		const { command, tap } = setup();
 		repo.insert(CHAT, { day: "2026-10-02", from: "14:00", to: "21:00" });
+		await command("/reminders");
 
-		const flipped = await press({
-			kind: "mode",
-			onlyReminders: true,
-			source: "list",
-		});
+		const flipped = await tap("rem:mode:only:list");
 
 		expect(subscribers.getOnlyReminders(CHAT)).toBe(true);
 		expect(flipped.edits[0]?.text).toContain("solo te escribiré");
 	});
 
-	test("cancel closes the picker", async () => {
-		const { press } = setup();
+	test("a half-finished picker survives a restart", async () => {
+		const first = setup();
+		await first.command("/remind");
+		await first.tap("day:2026-10-02");
+		await first.tap("other");
 
-		expect((await press({ kind: "cancel" })).edits[0]?.text).toBe("Cancelado.");
+		const second = setup();
+		const resumed = await second.tap("from:17:00", first.lastMessageId());
+		expect(resumed.edits[0]?.text).toBe(
+			"Vie, 2 oct desde las 17:00: ¿hasta qué hora?",
+		);
+
+		const saved = await second.tap("to:19:00", first.lastMessageId());
+		expect(saved.edits[0]?.text).toStartWith("✅ Te aviso");
+		expect(matching).toHaveLength(1);
+	});
+
+	test("a failure while saving is reported and ends the flow", async () => {
+		const { command, tap } = setup();
+		await command("/remind");
+		await tap("day:2026-10-02");
+		sendMatchingFails = true;
+
+		const failed = await tap("range:09:00-14:00");
+
+		expect(failed.edits[0]?.text).toBe("Algo ha fallado, inténtalo de nuevo.");
+		expect(conversationRows()).toBe(0);
 	});
 });

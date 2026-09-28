@@ -1,3 +1,7 @@
+import type {
+	ConversationData,
+	VersionedStateStorage,
+} from "@grammyjs/conversations";
 import type { Db } from "@/utils/db";
 import type { ChatId } from "./model";
 
@@ -77,5 +81,36 @@ export const createSubscribersRepository = (db: Db) => {
 		listSubscribers,
 		getOnlyReminders,
 		setOnlyReminders,
+	};
+};
+
+export const createConversationsRepository = <S = ConversationData>(
+	db: Db,
+): VersionedStateStorage<string, S> => {
+	const selectOne = db.query<{ data: string }, { key: string }>(
+		"SELECT data FROM conversations WHERE key = :key",
+	);
+
+	const upsert = db.query<void, { key: string; data: string; now: string }>(
+		`INSERT INTO conversations (key, data, updated_at)
+		VALUES (:key, :data, :now)
+		ON CONFLICT (key) DO UPDATE SET data = :data, updated_at = :now`,
+	);
+
+	const deleteOne = db.query<void, { key: string }>(
+		"DELETE FROM conversations WHERE key = :key",
+	);
+
+	return {
+		read: (key) => {
+			const row = selectOne.get({ key });
+			return row ? JSON.parse(row.data) : undefined;
+		},
+		write: (key, state) => {
+			upsert.run({ key, data: JSON.stringify(state), now: now() });
+		},
+		delete: (key) => {
+			deleteOne.run({ key });
+		},
 	};
 };

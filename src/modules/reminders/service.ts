@@ -1,7 +1,6 @@
 import type { ChatId, SubscribersRepository } from "@/modules/telegram";
 import { formatWallClock } from "@/utils/date";
 import type { Transaction } from "@/utils/db";
-import { type Callback, parse } from "./callback";
 import { MAX_REMINDERS, type ReminderModel } from "./model";
 import type { RemindersRepository } from "./repository";
 import * as views from "./views";
@@ -39,13 +38,14 @@ export type RemindersDeps = {
 	now?: () => Temporal.Instant;
 };
 
-/** What to do with a button tap: the view that replaces the message, and a toast. */
-export type Reply = { view?: views.View; answer?: string };
+/** Plain data, so the conversation can store it between taps. */
+export type SaveResult =
+	| { status: "expired" }
+	| { status: "limit" }
+	| { status: "duplicate"; reminder: ReminderModel["reminder"] }
+	| { status: "added"; reminder: ReminderModel["reminder"]; askMode: boolean };
 
 export type RemindersService = ReturnType<typeof createRemindersService>;
-
-const BROKEN_BUTTON = "Este botón ya no funciona. Usa /remind.";
-const DAY_GONE = "Ese día ya no está disponible";
 
 export const createRemindersService = (deps: RemindersDeps) => {
 	const { repo, subscribers, transaction, config } = deps;
@@ -69,8 +69,6 @@ export const createRemindersService = (deps: RemindersDeps) => {
 	const onlyReminders = (chatId: ChatId) =>
 		subscribers.getOnlyReminders(chatId) ?? false;
 
-	const start = (): views.View => views.dayPicker(today(), config.daysAhead, 0);
-
 	const list = (chatId: ChatId): views.View =>
 		views.list(repo.listByChat(chatId, today()), onlyReminders(chatId));
 
@@ -89,92 +87,39 @@ export const createRemindersService = (deps: RemindersDeps) => {
 			return { status: "added", reminder: repo.insert(chatId, range) };
 		});
 
+	/** Checks the day again: the button may be tapped long after it was drawn. */
 	const save = async (
 		chatId: ChatId,
 		range: ReminderModel["reminderRange"],
-	): Promise<Reply> => {
+	): Promise<SaveResult> => {
+		if (!isBookable(range.day)) return { status: "expired" };
+
 		const result = add(chatId, range);
-		if (result.status === "limit") return { view: views.limitReached };
+		if (result.status === "limit") return result;
 		if (result.status === "duplicate")
-			return { view: views.duplicate(result.reminder) };
+			return { status: "duplicate", reminder: result.reminder };
 
 		const askMode = subscribers.getOnlyReminders(chatId) === null;
 		await deps.sendMatching(chatId, (startsAt) =>
 			matches(result.reminder, startsAt),
 		);
-		return { view: views.saved(result.reminder, askMode) };
+		return { status: "added", reminder: result.reminder, askMode };
 	};
 
-	const handle = (
-		chatId: ChatId,
-		callback: Callback,
-		messageText: string,
-	): Reply | Promise<Reply> => {
-		switch (callback.kind) {
-			case "page": {
-				const last = views.pageCount(config.daysAhead) - 1;
-				return {
-					view: views.dayPicker(
-						today(),
-						config.daysAhead,
-						Math.min(callback.page, last),
-					),
-				};
-			}
-			case "day":
-				return {
-					view: views.rangePicker(
-						callback.day,
-						views.pageOf(today(), callback.day),
-					),
-				};
-			case "from":
-				return { view: views.fromPicker(callback.day) };
-			case "to":
-				return { view: views.toPicker(callback.day, callback.from) };
-			case "save":
-				return save(chatId, {
-					day: callback.day,
-					from: callback.from,
-					to: callback.to,
-				});
-			case "remove": {
-				const removed = repo.remove(chatId, callback.id);
-				return {
-					view: list(chatId),
-					answer: removed ? "Aviso quitado" : undefined,
-				};
-			}
-			case "mode":
-				subscribers.setOnlyReminders(chatId, callback.onlyReminders);
-				return {
-					view:
-						callback.source === "list"
-							? list(chatId)
-							: views.modeChosen(messageText, callback.onlyReminders),
-				};
-			case "cancel":
-				return { view: views.cancelled };
-		}
+	const remove = (chatId: ChatId, id: number): boolean =>
+		repo.remove(chatId, id);
+
+	const setMode = (chatId: ChatId, onlyReminders: boolean): void => {
+		subscribers.setOnlyReminders(chatId, onlyReminders);
 	};
 
-	/** `messageText` is the text of the message the button sits on. */
-	const press = async (
-		chatId: ChatId,
-		data: string,
-		messageText: string,
-	): Promise<Reply> => {
-		const callback = parse(data);
-		if (!callback) return { answer: BROKEN_BUTTON };
-
-		if ("day" in callback && !isBookable(callback.day))
-			return {
-				view: views.dayPicker(today(), config.daysAhead, 0, `${DAY_GONE}.`),
-				answer: DAY_GONE,
-			};
-
-		return await handle(chatId, callback, messageText);
+	return {
+		today,
+		isBookable,
+		daysAhead: config.daysAhead,
+		list,
+		save,
+		remove,
+		setMode,
 	};
-
-	return { start, list, press, brokenButton: BROKEN_BUTTON };
 };

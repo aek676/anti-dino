@@ -15,6 +15,8 @@ import {
 	type SlotsConfig,
 } from "@/modules/slots";
 import {
+	type BotContext,
+	createConversationsRepository,
 	createSubscribersRepository,
 	createTelegramService,
 	telegram,
@@ -25,7 +27,7 @@ import { log } from "@/utils/logger";
 
 const db = openDatabase(ENV.DATABASE_PATH);
 
-const bot = new Bot(ENV.TELEGRAM_BOT_TOKEN);
+const bot = new Bot<BotContext>(ENV.TELEGRAM_BOT_TOKEN);
 
 const subscribersRepository = createSubscribersRepository(db);
 
@@ -107,6 +109,7 @@ const app = new Elysia()
 	.use(
 		telegram({
 			bot,
+			conversations: createConversationsRepository(db),
 			config: {
 				publicUrl: ENV.PUBLIC_URL,
 				webhookPath: ENV.WEBHOOK_PATH,

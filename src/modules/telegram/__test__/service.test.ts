@@ -10,7 +10,7 @@ import {
 import { type Bot, GrammyError } from "grammy";
 import { type Db, openDatabase } from "@/utils/db";
 import { log } from "@/utils/logger";
-import type { Message } from "../model";
+import type { BotContext, Message } from "../model";
 import {
 	createSubscribersRepository,
 	type SubscribersRepository,
@@ -68,7 +68,7 @@ const fakeBot = (
 				return Promise.resolve(true);
 			},
 		},
-	} as unknown as Bot;
+	} as unknown as Bot<BotContext>;
 	return { bot, sent, edited };
 };
 

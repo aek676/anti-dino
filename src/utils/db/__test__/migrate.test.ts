@@ -25,7 +25,13 @@ describe("migrate", () => {
 			)
 			.all()
 			.map((row) => row.name);
-		expect(rows).toEqual(["alerts", "reminders", "slots", "subscribers"]);
+		expect(rows).toEqual([
+			"alerts",
+			"conversations",
+			"reminders",
+			"slots",
+			"subscribers",
+		]);
 	});
 
 	test("is idempotent", () => {
