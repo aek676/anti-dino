@@ -5,22 +5,29 @@ import { book, slotUrl } from "@/modules/book";
 import { createFreshaService, fresha } from "@/modules/fresha";
 import { HEALTH_PATH, health } from "@/modules/health";
 import {
+	createRemindersRepository,
+	createRemindersService,
+	registerReminders,
+} from "@/modules/reminders";
+import {
 	createSlotsRepository,
 	createSlotsService,
 	type SlotsConfig,
 } from "@/modules/slots";
 import {
+	type BotContext,
+	createConversationsRepository,
 	createSubscribersRepository,
 	createTelegramService,
 	telegram,
 } from "@/modules/telegram";
 import { watchdog } from "@/modules/watchdog";
-import { closeDatabase, openDatabase } from "@/utils/db";
+import { closeDatabase, createTransaction, openDatabase } from "@/utils/db";
 import { log } from "@/utils/logger";
 
 const db = openDatabase(ENV.DATABASE_PATH);
 
-const bot = new Bot(ENV.TELEGRAM_BOT_TOKEN);
+const bot = new Bot<BotContext>(ENV.TELEGRAM_BOT_TOKEN);
 
 const subscribersRepository = createSubscribersRepository(db);
 
@@ -46,6 +53,16 @@ const slotsService = createSlotsService({
 	config: slotsConfig,
 });
 
+const remindersRepository = createRemindersRepository(db);
+
+const remindersService = createRemindersService({
+	repo: remindersRepository,
+	subscribers: subscribersRepository,
+	sendMatching: slotsService.sendMatching,
+	transaction: createTransaction(db),
+	config: { timeZone: ENV.SALON_TIME_ZONE, daysAhead: ENV.DAYS_AHEAD },
+});
+
 const freshaService = createFreshaService(fetch, {
 	stepDelayMs: ENV.FRESHA_STEP_DELAY_MS,
 });
@@ -64,6 +81,8 @@ const app = new Elysia()
 			repo: slotsRepository,
 			fresha: freshaService,
 			notify: telegramService.notify,
+			notifyEach: telegramService.notifyEach,
+			reminders: remindersRepository,
 			notifyAdmin: telegramService.notifyAdmin,
 			edit: telegramService.edit,
 			config: {
@@ -90,6 +109,7 @@ const app = new Elysia()
 	.use(
 		telegram({
 			bot,
+			conversations: createConversationsRepository(db),
 			config: {
 				publicUrl: ENV.PUBLIC_URL,
 				webhookPath: ENV.WEBHOOK_PATH,
@@ -99,6 +119,7 @@ const app = new Elysia()
 			subscribe: subscribersRepository.subscribe,
 			unsubscribe: subscribersRepository.unsubscribe,
 			sendSlots: slotsService.sendCurrent,
+			handlers: [(bot) => registerReminders(bot, remindersService)],
 		}),
 	)
 	.onStop(({ store }) => {

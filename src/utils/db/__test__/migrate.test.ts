@@ -25,7 +25,13 @@ describe("migrate", () => {
 			)
 			.all()
 			.map((row) => row.name);
-		expect(rows).toEqual(["alerts", "slots", "subscribers"]);
+		expect(rows).toEqual([
+			"alerts",
+			"conversations",
+			"reminders",
+			"slots",
+			"subscribers",
+		]);
 	});
 
 	test("is idempotent", () => {
@@ -71,6 +77,7 @@ describe("migrate", () => {
 				created_at: "2026-09-14T10:00:00.000Z",
 				notify: 1,
 				updated_at: null,
+				only_reminders: null,
 			},
 		]);
 		old.close();

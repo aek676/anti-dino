@@ -121,4 +121,34 @@ describe("slots service", () => {
 			},
 		]);
 	});
+	test("sendMatching sends only the open slots that match and records the alert", async () => {
+		seed(["2026-09-17T11:30", "2026-09-17T17:00", "2026-09-18T17:15"]);
+
+		await service().sendMatching(7, (key) => key.slice(11) >= "17:00");
+
+		expect(sent).toEqual([
+			{
+				chatId: 7,
+				message: {
+					text: [
+						"<b>🎯 Ya hay 2 citas disponibles para ese aviso</b>",
+						`<b>Jue, 17 sept</b>\n${link("2026-09-17T17:00")}`,
+						`<b>Vie, 18 sept</b>\n${link("2026-09-18T17:15")}`,
+					].join("\n\n"),
+					buttons: bookButton,
+				},
+			},
+		]);
+		expect(
+			createSlotsRepository(db).listAlertStartTimes(7, MESSAGE_ID),
+		).toEqual(["2026-09-17T17:00", "2026-09-18T17:15"]);
+	});
+
+	test("sendMatching stays quiet when nothing matches", async () => {
+		seed(["2026-09-17T11:30"]);
+
+		await service().sendMatching(7, () => false);
+
+		expect(sent).toEqual([]);
+	});
 });

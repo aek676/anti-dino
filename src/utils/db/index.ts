@@ -31,3 +31,10 @@ export const closeDatabase = (db: Db): void => {
 	db.close();
 	log.info("database closed");
 };
+
+export const createTransaction =
+	(db: Db) =>
+	<T>(fn: () => T): T =>
+		db.transaction(fn)();
+
+export type Transaction = ReturnType<typeof createTransaction>;

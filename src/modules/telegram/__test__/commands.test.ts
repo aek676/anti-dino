@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Bot, Context } from "grammy";
 import { type Db, openDatabase } from "@/utils/db";
 import { COMMANDS, registerCommands } from "../commands";
+import type { BotContext } from "../model";
 import {
 	createSubscribersRepository,
 	type SubscribersRepository,
@@ -19,7 +20,7 @@ const fakeBot = () => {
 		on: (filter: string, handler: Handler) => {
 			updates.set(filter, handler);
 		},
-	} as unknown as Bot;
+	} as unknown as Bot<BotContext>;
 	return { bot, commands, updates };
 };
 

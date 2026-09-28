@@ -1,3 +1,8 @@
+import type { ConversationFlavor } from "@grammyjs/conversations";
+import type { Context } from "grammy";
+
+export type BotContext = ConversationFlavor<Context>;
+
 export type ChatId = number;
 export type MessageId = number;
 export type Delivery = Map<ChatId, MessageId>;
